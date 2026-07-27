@@ -1,0 +1,6 @@
+{
+  "name": "AI-Powered Hyperlocal Campaign Platform",
+  "description": "Enterprise-grade merchant dashboard and authentication gateway for a hyperlocal campaign generation platform, featuring AI micro-copy creators, store targeting matrices, catalog management, customer lead trackers, and seasonal insights.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

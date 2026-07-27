@@ -1,0 +1,562 @@
+{
+  "mockUsers": [
+    {
+      "email": "merchant@hyperlocal.ai",
+      "password": "$2b$10$RaW3yukiDrq6bvaZ9QBiieCoI1x1ZUEm8wUJnSNtrByHHX4wW/bqC",
+      "businessName": "Hyperlocal Organics Test MerchantLtdTest Merchant",
+      "ownerName": "Jane Doe",
+      "mobileNumber": "9876543210",
+      "gstin": "27AAAAA1111A1Z1",
+      "enabled": true,
+      "id": 1784299619472,
+      "registrationCompleted": false,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "onboardingCompleted": true
+    },
+    {
+      "id": 2,
+      "name": "saswatamishra828",
+      "ownerName": "saswatamishra828",
+      "email": "saswatamishra828@gmail.com",
+      "role": "MERCHANT",
+      "businessName": "AdPulse Dev Labs",
+      "mobileNumber": "9876543210",
+      "gstin": "27AAAAA1111A1Z1",
+      "enabled": true,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "password": "$2b$10$RaW3yukiDrq6bvaZ9QBiieCoI1x1ZUEm8wUJnSNtrByHHX4wW/bqC",
+      "registrationCompleted": true,
+      "onboardingCompleted": true
+    },
+    {
+      "id": 1,
+      "name": "Demo Merchant",
+      "ownerName": "Demo Merchant",
+      "email": "demo@merchant.com",
+      "role": "MERCHANT",
+      "businessName": "Demo Merchant Business",
+      "mobileNumber": "9999999999",
+      "gstin": "27AAAAA1111A1Z1",
+      "enabled": true,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "password": "$2b$10$xLkt5qDOPTrDZnUqDUwnKug8NEIlzrLKs/qC7TVrROdK6mNTWHY3C"
+    },
+    {
+      "email": "nshishirkant@gmail.com",
+      "password": "$2b$10$RaW3yukiDrq6bvaZ9QBiieCoI1x1ZUEm8wUJnSNtrByHHX4wW/bqC",
+      "businessName": "gaming",
+      "ownerName": "Shishra",
+      "mobileNumber": "09692533537",
+      "registrationCompleted": true,
+      "enabled": true
+    },
+    {
+      "email": "newmerchant@hyperlocal.ai",
+      "password": "$2b$10$L.1JUylxS9xRtLDICPKPVemSdfV0JnoXCbdebiTmDksBS8.pa1.u.",
+      "businessName": "Hyperlocal Organics",
+      "ownerName": "Jane Doe",
+      "mobileNumber": "9876543210",
+      "gstin": "",
+      "registrationCompleted": true,
+      "enabled": true,
+      "id": 1784470714291,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "onboardingCompleted": true
+    }
+  ],
+  "userStores": {
+    "nshishirkant@gmail.com": [
+      {
+        "id": "store-1",
+        "name": "AdPulse Hyperlocal Hub - Main Branch",
+        "address": "102, Connaught Place, New Delhi, 110001",
+        "phone": "+91 98765 43210",
+        "category": "SaaS & Ad Services",
+        "hours": "09:00 AM - 08:00 PM",
+        "radiusTargetKm": 5,
+        "status": "Active",
+        "latitude": 28.6304,
+        "longitude": 77.2177
+      },
+      {
+        "id": "store-2",
+        "name": "AdPulse Premium Express",
+        "address": "405, Sector 5, Salt Lake, Kolkata, 700091",
+        "phone": "+91 98765 11223",
+        "category": "Retail Apparel",
+        "hours": "10:00 AM - 09:30 PM",
+        "radiusTargetKm": 8,
+        "status": "Active",
+        "latitude": 22.5726,
+        "longitude": 88.4339
+      }
+    ],
+    "saswatamishra828@gmail.com": [
+      {
+        "id": "store-1784402282644",
+        "name": "Ram Electronics",
+        "address": "Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar ",
+        "phone": "9662533537",
+        "category": "Electronics",
+        "hours": "10:00 AM - 09:30 PM",
+        "radiusTargetKm": 24,
+        "latitude": 20.2380445,
+        "longitude": 85.7231075,
+        "status": "Active"
+      }
+    ],
+    "merchant@hyperlocal.ai": [
+      {
+        "id": "store-1784309934931",
+        "name": "Hyperlocal Organics Test OutletLtd",
+        "address": "Test Address",
+        "phone": "9876543210+91 99999 99999",
+        "category": "Grocery",
+        "hours": "10:00 AM - 09:30 PM09:00 - 21:00",
+        "radiusTargetKm": 5,
+        "latitude": 21.4669,
+        "longitude": 83.9812,
+        "status": "Active"
+      }
+    ],
+    "newmerchant@hyperlocal.ai": [
+      {
+        "id": "store-1784471118911",
+        "name": "Hyperlocal OrganicsHyperlocal Organics Store",
+        "address": "123 Main St, New York, NY",
+        "phone": "98765432109876543210",
+        "category": "Clothing",
+        "hours": "10:00 AM - 09:30 PM09:00 - 18:00",
+        "radiusTargetKm": 5,
+        "latitude": 21.4669,
+        "longitude": 83.9812,
+        "status": "Active"
+      }
+    ]
+  },
+  "userProducts": {
+    "saswatamishra828@gmail.com": [],
+    "merchant@hyperlocal.ai": [],
+    "newmerchant@hyperlocal.ai": []
+  },
+  "userCampaigns": {
+    "saswatamishra828@gmail.com": [],
+    "merchant@hyperlocal.ai": [
+      {
+        "id": "camp-onb-1784309934931",
+        "name": "First Launch Celebration Wave",
+        "goal": "Increase Sales",
+        "festival": "Regional Seasonal Fest",
+        "audience": "All aged 25-34/35-44",
+        "radiusKm": 5,
+        "budget": 7500,
+        "offer": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "tone": "Friendly",
+        "platforms": [
+          "Instagram",
+          "Facebook",
+          "WhatsApp"
+        ],
+        "status": "Active",
+        "reach": 33750,
+        "engagement": 9000,
+        "leads": 750,
+        "roi": 310,
+        "startDate": "2026-07-17",
+        "generatedHeadline": "Exclusive opening special of Hyperlocal Organics Test OutletLtd!",
+        "generatedCaption": "Visit us nearby Test Address! Aligned for Regional Seasonal Fest celebrations. Hyperlocal Organics Test MerchantLtdTest Merchant is beautifully poised to capture high loyalty inside the Grocery vertical around Test Address. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable."
+      }
+    ],
+    "newmerchant@hyperlocal.ai": [
+      {
+        "id": "camp-onb-1784471118911",
+        "name": "First Launch Celebration Wave",
+        "goal": "Increase Sales",
+        "festival": "Regional Seasonal Fest",
+        "audience": "All aged 25-34/35-44",
+        "radiusKm": 5,
+        "budget": 7500,
+        "offer": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "tone": "Friendly",
+        "platforms": [
+          "Instagram",
+          "Facebook",
+          "WhatsApp"
+        ],
+        "status": "Active",
+        "reach": 33750,
+        "engagement": 9000,
+        "leads": 750,
+        "roi": 310,
+        "startDate": "2026-07-19",
+        "generatedHeadline": "Exclusive opening special of Hyperlocal OrganicsHyperlocal Organics Store!",
+        "generatedCaption": "Visit us nearby 123 Main St, New York, NY! Aligned for Regional Seasonal Fest celebrations. Hyperlocal Organics is beautifully poised to capture high loyalty inside the Clothing vertical around 123 Main St, New York, NY. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable."
+      }
+    ]
+  },
+  "userLeads": {
+    "saswatamishra828@gmail.com": [],
+    "merchant@hyperlocal.ai": [],
+    "newmerchant@hyperlocal.ai": []
+  },
+  "userOnboardings": {
+    "saswatamishra828@gmail.com": {
+      "completed": true,
+      "business": {
+        "businessName": "AdPulse Dev Labs",
+        "category": "Electronics",
+        "description": "Our Business Provide A1 Quality Products",
+        "gstNumber": "",
+        "website": ""
+      },
+      "store": {
+        "storeName": "Ram Electronics",
+        "storeAddress": "Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar ",
+        "contactNumber": "9662533537",
+        "openingHours": "10:00 AM - 09:30 PM",
+        "storeType": "Single Store"
+      },
+      "location": {
+        "latitude": 20.2380445,
+        "longitude": 85.7231075,
+        "radiusKm": 24
+      },
+      "audience": {
+        "ageGroups": [
+          "25-34",
+          "35-44"
+        ],
+        "gender": "All",
+        "customerTypes": [
+          "Local Residents",
+          "Professionals"
+        ]
+      },
+      "social": {
+        "instagram": "",
+        "facebook": "https://www.facebook.com/profile.php?id=61591710820651",
+        "whatsApp": "",
+        "twitter": ""
+      },
+      "preferences": {
+        "campaignGoal": "Increase Sales",
+        "budgetRange": "₹1,000 - ₹5,000",
+        "tone": "Professional"
+      },
+      "aiAnalysis": {
+        "businessSummary": "AdPulse Dev Labs is beautifully poised to capture high loyalty inside the Electronics vertical around Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar . Delivering high-traction Increase Sales campaigns within a 24km zone remains highly viable.",
+        "suggestedCampaignTypes": [
+          {
+            "name": "First Launch Celebration Wave",
+            "description": "Promote opening specials on social circles with local maps markers."
+          },
+          {
+            "name": "Direct Neighbors WhatsApp Bundle",
+            "description": "Direct personalized greeting outreach highlighting store convenience."
+          }
+        ],
+        "recommendedAudience": "All, specifically Local Residents, Professionals aged 25-34, 35-44 residing near Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar .",
+        "recommendedFestivals": [
+          "Regional Seasonal Fest",
+          "New Year Clearance Sale",
+          "National Holidays Celebration"
+        ],
+        "suggestedOfferStrategy": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "marketingReadinessScore": 78
+      }
+    },
+    "demo@merchant.com": {
+      "completed": true,
+      "business": {
+        "businessName": "Demo Merchant Business",
+        "category": "Retail",
+        "gstNumber": "27AAAAA1111A1Z1"
+      },
+      "store": {
+        "name": "Demo Store",
+        "address": "102 Connaught Place",
+        "openingHours": "9am-9pm"
+      },
+      "location": {
+        "latitude": 28.6304,
+        "longitude": 77.2177,
+        "radiusKm": 5
+      },
+      "audience": {
+        "ageMin": 18,
+        "ageMax": 65,
+        "gender": "All",
+        "customerTypes": []
+      },
+      "social": {},
+      "preferences": {},
+      "aiAnalysis": {}
+    },
+    "nshishirkant@gmail.com": {
+      "completed": false,
+      "business": null,
+      "store": null,
+      "location": null,
+      "audience": null,
+      "social": null,
+      "preferences": null,
+      "aiAnalysis": null
+    },
+    "merchant@hyperlocal.ai": {
+      "completed": true,
+      "business": {
+        "businessName": "Hyperlocal Organics Test MerchantLtdTest Merchant",
+        "category": "Grocery",
+        "description": "",
+        "gstNumber": "",
+        "website": ""
+      },
+      "store": {
+        "storeName": "Hyperlocal Organics Test OutletLtd",
+        "storeAddress": "Test Address",
+        "contactNumber": "9876543210+91 99999 99999",
+        "openingHours": "10:00 AM - 09:30 PM09:00 - 21:00",
+        "storeType": "Single Store"
+      },
+      "location": {
+        "latitude": 21.4669,
+        "longitude": 83.9812,
+        "radiusKm": 5
+      },
+      "audience": {
+        "ageGroups": [
+          "25-34",
+          "35-44"
+        ],
+        "gender": "All",
+        "customerTypes": [
+          "Local Residents",
+          "Professionals"
+        ]
+      },
+      "social": {
+        "instagram": "",
+        "facebook": "",
+        "whatsApp": "",
+        "twitter": ""
+      },
+      "preferences": {
+        "campaignGoal": "Increase Sales",
+        "budgetRange": "₹5,000 - ₹10,000",
+        "tone": "Friendly"
+      },
+      "aiAnalysis": {
+        "businessSummary": "Hyperlocal Organics Test MerchantLtdTest Merchant is beautifully poised to capture high loyalty inside the Grocery vertical around Test Address. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable.",
+        "suggestedCampaignTypes": [
+          {
+            "name": "First Launch Celebration Wave",
+            "description": "Promote opening specials on social circles with local maps markers."
+          },
+          {
+            "name": "Direct Neighbors WhatsApp Bundle",
+            "description": "Direct personalized greeting outreach highlighting store convenience."
+          }
+        ],
+        "recommendedAudience": "All, specifically Local Residents, Professionals aged 25-34, 35-44 residing near Test Address.",
+        "recommendedFestivals": [
+          "Regional Seasonal Fest",
+          "New Year Clearance Sale",
+          "National Holidays Celebration"
+        ],
+        "suggestedOfferStrategy": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "marketingReadinessScore": 78
+      }
+    },
+    "newmerchant@hyperlocal.ai": {
+      "completed": true,
+      "business": {
+        "businessName": "Hyperlocal Organics",
+        "category": "Clothing",
+        "description": "",
+        "gstNumber": "",
+        "website": ""
+      },
+      "store": {
+        "storeName": "Hyperlocal OrganicsHyperlocal Organics Store",
+        "storeAddress": "123 Main St, New York, NY",
+        "contactNumber": "98765432109876543210",
+        "openingHours": "10:00 AM - 09:30 PM09:00 - 18:00",
+        "storeType": "Single Store"
+      },
+      "location": {
+        "latitude": 21.4669,
+        "longitude": 83.9812,
+        "radiusKm": 5
+      },
+      "audience": {
+        "ageGroups": [
+          "25-34",
+          "35-44"
+        ],
+        "gender": "All",
+        "customerTypes": [
+          "Local Residents",
+          "Professionals"
+        ]
+      },
+      "social": {
+        "instagram": "",
+        "facebook": "",
+        "whatsApp": "",
+        "twitter": ""
+      },
+      "preferences": {
+        "campaignGoal": "Increase Sales",
+        "budgetRange": "₹5,000 - ₹10,000",
+        "tone": "Friendly"
+      },
+      "aiAnalysis": {
+        "businessSummary": "Hyperlocal Organics is beautifully poised to capture high loyalty inside the Clothing vertical around 123 Main St, New York, NY. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable.",
+        "suggestedCampaignTypes": [
+          {
+            "name": "First Launch Celebration Wave",
+            "description": "Promote opening specials on social circles with local maps markers."
+          },
+          {
+            "name": "Direct Neighbors WhatsApp Bundle",
+            "description": "Direct personalized greeting outreach highlighting store convenience."
+          }
+        ],
+        "recommendedAudience": "All, specifically Local Residents, Professionals aged 25-34, 35-44 residing near 123 Main St, New York, NY.",
+        "recommendedFestivals": [
+          "Regional Seasonal Fest",
+          "New Year Clearance Sale",
+          "National Holidays Celebration"
+        ],
+        "suggestedOfferStrategy": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "marketingReadinessScore": 78
+      }
+    }
+  },
+  "userSocialConnections": {
+    "saswatamishra828@gmail.com": null,
+    "merchant@hyperlocal.ai": null,
+    "newmerchant@hyperlocal.ai": {
+      "connections": [
+        {
+          "platform": "whatsapp",
+          "connected": true,
+          "name": "Production WhatsApp Cloud",
+          "accountId": "mock_whatsapp_id_789",
+          "connectedAt": "2026-07-19T14:28:01.766Z",
+          "accessToken": "957ec443ec7ef4d6b55f836ee970409e:1173c98b996cb75efcfe55e9348b77a3e76d065d28fe4bca8d9cf925affaa206"
+        },
+        {
+          "platform": "google",
+          "connected": true,
+          "name": "Production Google Maps Profile",
+          "accountId": "mock_google_location_101",
+          "connectedAt": "2026-07-19T14:28:01.767Z",
+          "accessToken": "bedc3cc355b198ee1d1a8b9efcbe483c:52a507ea7c8f10ad5639af88bef7e61b93298d646cafedc0da868ebd964c0740"
+        }
+      ],
+      "credentials": {
+        "facebookPageId": "",
+        "facebookAccessToken": "",
+        "instagramBusinessId": "1b91c055dbde102ec83edb9e0d89a838:a84bbe0247b3f62140751aa85f37115c37ee1501f39901a3c0143f41bc0ded78",
+        "whatsappPhoneId": "8576bbedccc1bd6b2c1f0d66a1e41c28:c98bbb34a6eb95b44e20309e60e6c0a4dbb4549cf7f4738c6a0028692d99e889",
+        "whatsappAccessToken": "957ec443ec7ef4d6b55f836ee970409e:1173c98b996cb75efcfe55e9348b77a3e76d065d28fe4bca8d9cf925affaa206",
+        "googleLocationId": "7fb4556d934a0a682a244640acc7e4ae:3bc6d7ce1bfd9075fab17969f178716abcdf71802e7cd55057dbdc5c9024bc93",
+        "googleAccessToken": "bedc3cc355b198ee1d1a8b9efcbe483c:52a507ea7c8f10ad5639af88bef7e61b93298d646cafedc0da868ebd964c0740"
+      }
+    }
+  },
+  "userNotifications": {
+    "saswatamishra828@gmail.com": [],
+    "merchant@hyperlocal.ai": [],
+    "newmerchant@hyperlocal.ai": [
+      {
+        "id": "notif-1784471281768-1pnge",
+        "title": "Key Ring Refreshed",
+        "message": "Production API Keys & secrets successfully updated and saved using CBC-256 cipher vaults.",
+        "type": "success",
+        "timestamp": "2026-07-19T14:28:01.770Z",
+        "read": false
+      }
+    ]
+  },
+  "userPublishHistory": {
+    "saswatamishra828@gmail.com": [
+      {
+        "id": "hist-1784448253844-1mju",
+        "campaignId": "camp-pub-1784448253829",
+        "campaignName": "Immediate Broadcast",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra828",
+        "platform": "facebook",
+        "publishDate": "2026-07-19",
+        "publishTime": "13:34:13",
+        "status": "SUCCESS",
+        "postId": "fa-post-43294687",
+        "caption": "✨ Beautiful Ad Alert! FLAT 20% OFF at Elite Saree Kendra! Exclusive Regional Handloom Festival Collection Celebration. Claim local coupons in bio now! ✨",
+        "bannerUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-1",
+        "campaignId": "camp-1",
+        "campaignName": "Diwali Festive Sparkle Mega Drive",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra828",
+        "platform": "facebook",
+        "publishDate": "2025-11-10",
+        "publishTime": "18:00:00",
+        "status": "SUCCESS",
+        "postId": "fb-post-982347102",
+        "caption": "✨ Celebrate the festival of lights! Buy 2 outlets and claim a 3rd FREE. Offer valid for local neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-2",
+        "campaignId": "camp-1",
+        "campaignName": "Diwali Festive Sparkle Mega Drive",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra828",
+        "platform": "instagram",
+        "publishDate": "2025-11-10",
+        "publishTime": "18:00:05",
+        "status": "SUCCESS",
+        "postId": "ig-media-284729104",
+        "caption": "✨ Celebrate the festival of lights! Buy 2 outlets and claim a 3rd FREE. Offer valid for local neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-3",
+        "campaignId": "camp-2",
+        "campaignName": "Holi Organic Colors Carnival",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra828",
+        "platform": "instagram",
+        "publishDate": "2026-03-12",
+        "publishTime": "10:15:00",
+        "status": "SUCCESS",
+        "postId": "ig-media-394857201",
+        "caption": "🎨 Splash of comfort! Get premium footwear at flat 20% off. Shop now!",
+        "bannerUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-4",
+        "campaignId": "camp-2",
+        "campaignName": "Holi Organic Colors Carnival",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra828",
+        "platform": "whatsapp",
+        "publishDate": "2026-03-12",
+        "publishTime": "10:15:30",
+        "status": "FAILED",
+        "postId": "N/A",
+        "errorMessage": "WhatsApp Cloud API: Authentication failed. Invalid System User token.",
+        "caption": "🎨 Splash of comfort! Get premium footwear at flat 20% off. Shop now!",
+        "bannerUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&h=500&fit=crop&q=80"
+      }
+    ]
+  }
+}

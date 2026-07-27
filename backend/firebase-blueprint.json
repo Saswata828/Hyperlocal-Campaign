@@ -1,0 +1,29 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Secure user profiles and credentials stored in the database",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "gstin": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "registrationCompleted": { "type": "boolean" },
+        "onboarded": { "type": "boolean" },
+        "onboardingStep": { "type": "string" }
+      },
+      "required": ["email", "password"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User credentials and authentication profiles"
+    }
+  }
+}

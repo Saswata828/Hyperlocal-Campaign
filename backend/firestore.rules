@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global default catch-all: reject everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common global helper primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Mandating verified authentication
+    function isVerifiedUser() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Users Collection Rules (Accessible directly or via REST endpoint validation)
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Stores Collection Rules
+    match /stores/{storeId} {
+      allow read: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(storeId) && incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(storeId) && existing().ownerId == request.auth.uid && incoming().ownerId == request.auth.uid;
+      allow delete: if isVerifiedUser() && isValidId(storeId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Products Collection Rules
+    match /products/{productId} {
+      allow read: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(productId) && incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(productId) && existing().ownerId == request.auth.uid && incoming().ownerId == request.auth.uid;
+      allow delete: if isVerifiedUser() && isValidId(productId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Campaigns Collection Rules
+    match /campaigns/{campaignId} {
+      allow read: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(campaignId) && incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(campaignId) && existing().ownerId == request.auth.uid && incoming().ownerId == request.auth.uid;
+      allow delete: if isVerifiedUser() && isValidId(campaignId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Leads Collection Rules
+    match /leads/{leadId} {
+      allow read: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(leadId) && incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(leadId) && existing().ownerId == request.auth.uid && incoming().ownerId == request.auth.uid;
+      allow delete: if isVerifiedUser() && isValidId(leadId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Notifications Collection Rules
+    match /notifications/{notifId} {
+      allow read: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(notifId) && incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(notifId) && existing().ownerId == request.auth.uid && incoming().ownerId == request.auth.uid;
+      allow delete: if isVerifiedUser() && isValidId(notifId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}
