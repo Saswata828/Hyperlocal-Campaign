@@ -109,8 +109,8 @@ app.use((req, res, next) => {
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const META_VERSION = process.env.META_API_VERSION || process.env.META_GRAPH_API_VERSION || "v20.0";
-const META_APP_ID = process.env.META_APP_ID || process.env.FACEBOOK_APP_ID || "1359554956132165";
-const META_APP_SECRET = process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "5a2acf184bc034c30684d597fbc61b4d";
+const META_APP_ID = process.env.META_APP_ID || process.env.FACEBOOK_APP_ID || "";
+const META_APP_SECRET = process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "";
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI || "";
 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.

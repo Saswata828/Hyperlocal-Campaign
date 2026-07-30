@@ -1,7 +1,11 @@
-# Environment variables
+# Environment variables & secrets
 .env
 .env.*
 !.env.example
+firebase-applet-config.json
+**/firebase-applet-config.json
+db_state.json
+**/db_state.json
 
 # Dependencies
 node_modules/
