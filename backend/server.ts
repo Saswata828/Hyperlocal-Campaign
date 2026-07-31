@@ -96,11 +96,29 @@ function logGeminiError(context: string, error: any) {
 // Create Express instance
 const app = express();
 
-// Enable CORS for Vercel / cross-origin deployments
+// Enable CORS for Vercel / cross-origin deployments with production domain security
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  const configuredAppUrl = process.env.VITE_APP_URL || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+  
+  if (!origin) {
+    res.header("Access-Control-Allow-Origin", "*");
+  } else if (
+    origin.endsWith(".vercel.app") ||
+    origin.endsWith(".onrender.com") ||
+    origin.includes("localhost") ||
+    origin.includes("127.0.0.1") ||
+    (configuredAppUrl && origin === configuredAppUrl.replace(/\/+$/, ""))
+  ) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
@@ -934,12 +952,10 @@ const authGuard = (req: any, res: any, next: any) => {
 
 // Google OAuth URL Generation
 app.get("/api/auth/google/url", (req, res) => {
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
-  const host = req.get("host") || "localhost";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 
-  if (!googleClientId || isLocalhost) {
-    console.log(`[GOOGLE OAUTH] localhost origin detected or client ID missing. Falling back to Google mock login chooser.`);
+  if (!googleClientId) {
+    console.log(`[GOOGLE OAUTH] GOOGLE_CLIENT_ID environment variable is missing. Falling back to Google mock login chooser.`);
     return res.json({
       url: "/auth/google/mock",
       isMock: true
@@ -953,12 +969,9 @@ app.get("/api/auth/google/url", (req, res) => {
     const host = req.get("host") || "localhost";
     const protocol = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
     
-    // Use NEXT_PUBLIC_APP_URL in production, fallback to dynamic request URL otherwise
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL && !host.includes("localhost") && !host.includes("127.0.0.1")
-      ? process.env.NEXT_PUBLIC_APP_URL 
-      : `${protocol}://${host}`;
+    const appUrl = process.env.VITE_APP_URL || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
       
-    redirectUri = `${appUrl}/auth/google/callback`;
+    redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
   }
 
   const params = new URLSearchParams({
@@ -984,7 +997,7 @@ app.get("/api/auth/google/exchange", async (req, res) => {
   }
 
   try {
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
     const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     // Fallback if client ID is missing (for mock flow)

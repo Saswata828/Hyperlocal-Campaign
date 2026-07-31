@@ -53,7 +53,7 @@ export const ConnectedAccounts: React.FC = () => {
   const fetchConnections = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/social/connections', {
+      const response = await fetch(getApiUrl('/api/social/connections'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
         }
@@ -96,7 +96,7 @@ export const ConnectedAccounts: React.FC = () => {
     setActionLoading(platform);
     try {
       // 1. Fetch OAuth URL from server
-      const res = await fetch(`/api/social/oauth-url?platform=${platform}`, {
+      const res = await fetch(getApiUrl(`/api/social/oauth-url?platform=${platform}`), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
         }
@@ -120,42 +120,21 @@ export const ConnectedAccounts: React.FC = () => {
           `width=${width},height=${height},left=${left},top=${top}`
         );
 
-        if (!popup) {
-          showAlert('error', 'Popup blocked. Please enable popups to connect social channels.');
-          setActionLoading(null);
-          return;
-        }
-
-        // Wait for connection message
-        const handleMessage = (e: MessageEvent) => {
-          if (e.data?.type === 'OAUTH_AUTH_SUCCESS' && e.data?.platform === platform) {
-            showAlert('success', `Successfully connected your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account in Sandbox mode!`);
+        const checkTimer = setInterval(() => {
+          if (!popup || popup.closed) {
+            clearInterval(checkTimer);
+            setActionLoading(null);
             fetchConnections();
-            window.removeEventListener('message', handleMessage);
           }
-        };
-        window.addEventListener('message', handleMessage);
-      } else {
-        // Open live official OAuth provider URL
-        const popup = window.open(url, `Connect ${platform}`, 'width=600,height=700');
-        if (!popup) {
-          showAlert('error', 'Popup blocked. Please enable popups to authenticate.');
-          setActionLoading(null);
-          return;
-        }
+        }, 1000);
+        return;
+      }
 
-        const handleMessage = (e: MessageEvent) => {
-          if (e.data?.type === 'OAUTH_AUTH_SUCCESS') {
-            showAlert('success', `Successfully linked your official ${platform} account!`);
-            fetchConnections();
-            window.removeEventListener('message', handleMessage);
-          }
-        };
-        window.addEventListener('message', handleMessage);
+      if (url) {
+        window.location.href = url;
       }
     } catch (err: any) {
-      showAlert('error', `OAuth initiation failed: ${err.message}`);
-    } finally {
+      showAlert('error', err.message || 'Failed to initiate social connection.');
       setActionLoading(null);
     }
   };
@@ -164,7 +143,7 @@ export const ConnectedAccounts: React.FC = () => {
     if (!window.confirm(`Are you sure you want to disconnect your ${platform} integration?`)) return;
     setActionLoading(platform);
     try {
-      const res = await fetch('/api/social/disconnect', {
+      const res = await fetch(getApiUrl('/api/social/disconnect'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +167,7 @@ export const ConnectedAccounts: React.FC = () => {
   const handleRefreshToken = async (platform: string) => {
     setActionLoading(platform);
     try {
-      const res = await fetch('/api/social/refresh-token', {
+      const res = await fetch(getApiUrl('/api/social/refresh-token'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +194,7 @@ export const ConnectedAccounts: React.FC = () => {
     e.preventDefault();
     setActionLoading('save-keys');
     try {
-      const res = await fetch('/api/social/connect-direct', {
+      const res = await fetch(getApiUrl('/api/social/connect-direct'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

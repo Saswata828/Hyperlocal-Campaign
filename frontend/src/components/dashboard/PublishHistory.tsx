@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getApiUrl } from '../../services/api';
 import { 
   Facebook, 
   Instagram, 
@@ -49,7 +50,7 @@ export const PublishHistory: React.FC = () => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/social/publish-history', {
+      const response = await fetch(getApiUrl('/api/social/publish-history'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
         }
@@ -78,7 +79,7 @@ export const PublishHistory: React.FC = () => {
     e.stopPropagation(); // Avoid opening details modal
     setActionLoading(entry.id);
     try {
-      const response = await fetch('/api/social/retry-publish', {
+      const response = await fetch(getApiUrl('/api/social/retry-publish'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

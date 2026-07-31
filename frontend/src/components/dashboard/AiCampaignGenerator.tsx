@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getApiUrl } from '../../services/api';
 import { 
   Sparkles, 
   Settings, 
@@ -285,7 +286,7 @@ export const AiCampaignGenerator: React.FC<{
     showNotification('info', `Regenerating ${section} via Gemini...`);
 
     try {
-      const response = await fetch('/api/campaigns/copilot-regenerate-section', {
+      const response = await fetch(getApiUrl('/api/campaigns/copilot-regenerate-section'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

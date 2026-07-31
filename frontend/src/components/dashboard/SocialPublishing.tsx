@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { getApiUrl } from '../../services/api';
 import { 
   Instagram, 
   Facebook, 
@@ -92,7 +93,7 @@ export const SocialPublishing: React.FC = () => {
         'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
       };
       
-      const connRes = await fetch('/api/social/connections', { headers });
+      const connRes = await fetch(getApiUrl('/api/social/connections'), { headers });
       if (connRes.ok) {
         const connData = await connRes.json();
         const connArr = connData.connections || [];
@@ -118,7 +119,7 @@ export const SocialPublishing: React.FC = () => {
       }
 
       setLoadingScheduled(true);
-      const postsRes = await fetch('/api/campaigns', { headers });
+      const postsRes = await fetch(getApiUrl('/api/campaigns'), { headers });
       if (postsRes.ok) {
         const campaigns = await postsRes.json();
         const scheduledOnes = campaigns
@@ -158,7 +159,7 @@ export const SocialPublishing: React.FC = () => {
     setPublishedResults(null);
 
     try {
-      const response = await fetch('/api/social/publish', {
+      const response = await fetch(getApiUrl('/api/social/publish'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +207,7 @@ export const SocialPublishing: React.FC = () => {
 
     setErrorLog(null);
     try {
-      const response = await fetch('/api/social/schedule', {
+      const response = await fetch(getApiUrl('/api/social/schedule'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ export const SocialPublishing: React.FC = () => {
       const data = await response.json();
       if (response.ok && data.success) {
         // Refresh scheduled list
-        const postsRes = await fetch('/api/campaigns', {
+        const postsRes = await fetch(getApiUrl('/api/campaigns'), {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}` }
         });
         if (postsRes.ok) {
@@ -958,7 +959,7 @@ export const SocialPublishing: React.FC = () => {
                           onClick={async () => {
                             if (confirm("Are you sure you want to cancel this scheduled post?")) {
                               try {
-                                const res = await fetch(`/api/campaigns/${post.id}`, {
+                                const res = await fetch(getApiUrl(`/api/campaigns/${post.id}`), {
                                   method: 'DELETE',
                                   headers: { 'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}` }
                                 });

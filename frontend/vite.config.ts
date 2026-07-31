@@ -4,7 +4,7 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
-  const backendUrl = process.env.APP_URL || '';
+  const backendUrl = process.env.VITE_BACKEND_URL || process.env.VITE_API_BASE_URL || process.env.APP_URL || 'https://hyperlocal-campaign.onrender.com';
   return {
     plugins: [react(), tailwindcss()],
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],

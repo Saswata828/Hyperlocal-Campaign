@@ -1,29 +1,23 @@
 import axios from "axios";
 
-// Centralized API Base URL config. 
-// Uses relative paths on localhost, but resolves the compiled backend Cloud Run URL in production (e.g. Netlify)
-const getBackendBaseUrl = () => {
-  if (typeof window === "undefined") return "/api";
-  
-  // If we are on localhost, use relative path to proxy easily through Express dev server
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    return "/api";
-  }
+// Centralized API Base URL configuration
+export const DEFAULT_PRODUCTION_BACKEND = "https://hyperlocal-campaign.onrender.com";
 
-  // If we are on Netlify or any other external domain, use the compiled VITE_BACKEND_URL (Cloud Run URL)
-  // or fallback to the current origin if we are directly on the Cloud Run URL.
-  const envBackendUrl = (import.meta as any).env?.VITE_BACKEND_URL || "";
-  if (envBackendUrl) {
-    return `${envBackendUrl}/api`;
-  }
+export const API_BASE = (
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  ((import.meta as any).env?.VITE_BACKEND_URL ? `${(import.meta as any).env.VITE_BACKEND_URL}/api` : `${DEFAULT_PRODUCTION_BACKEND}/api`)
+).replace(/\/+$/, "");
 
-  return "/api";
+export const getApiUrl = (path: string): string => {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  if (cleanPath.startsWith("/api/")) {
+    return `${API_BASE}${cleanPath.substring(4)}`;
+  }
+  return `${API_BASE}${cleanPath}`;
 };
 
-const API_BASE_URL = getBackendBaseUrl();
-
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE,
   headers: {
     "Content-Type": "application/json",
   },
@@ -272,9 +266,8 @@ async function runApi<T>(apiPromise: Promise<T>, emulatedFn: () => Promise<T>): 
 export const apiService = {
   // --- AUTH SERVICES ---
   async getGoogleAuthUrl() {
-    const redirectUri = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      ? `${window.location.origin}/auth/google/callback`
-      : "https://zippy-rolypoly-6d04f6.netlify.app/auth/google/callback";
+    const appUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
     return runApi(
       apiClient.get(`/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`).then(res => res.data),
       async () => {
@@ -287,9 +280,8 @@ export const apiService = {
   },
 
   async exchangeGoogleCode(code: string) {
-    const redirectUri = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      ? `${window.location.origin}/auth/google/callback`
-      : "https://zippy-rolypoly-6d04f6.netlify.app/auth/google/callback";
+    const appUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
     return runApi(
       apiClient.get(`/auth/google/exchange?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`).then(res => res.data),
       async () => {

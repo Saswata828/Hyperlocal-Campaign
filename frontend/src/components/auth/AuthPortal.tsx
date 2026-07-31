@@ -78,7 +78,14 @@ export function AuthPortal({ initialMode = 'signin', onSuccess, onCancel, prefil
   React.useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
       const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+      const isAllowedOrigin = 
+        origin.includes('onrender.com') || 
+        origin.endsWith('.vercel.app') || 
+        origin.endsWith('.run.app') || 
+        origin.includes('localhost') || 
+        origin.includes('127.0.0.1');
+      
+      if (!isAllowedOrigin) {
         return;
       }
       
