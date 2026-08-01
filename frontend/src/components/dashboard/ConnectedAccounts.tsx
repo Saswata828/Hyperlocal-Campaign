@@ -1,18 +1,19 @@
 import * as React from 'react';
-import { 
-  Facebook, 
-  Instagram, 
-  MessageCircle, 
-  MapPin, 
-  Sparkles, 
-  Check, 
-  AlertCircle, 
-  Trash2, 
-  Link2, 
-  Unlink, 
-  Info, 
-  RefreshCw, 
-  Sliders, 
+import { getApiUrl } from '../../services/api';
+import {
+  Facebook,
+  Instagram,
+  MessageCircle,
+  MapPin,
+  Sparkles,
+  Check,
+  AlertCircle,
+  Trash2,
+  Link2,
+  Unlink,
+  Info,
+  RefreshCw,
+  Sliders,
   ShieldCheck,
   Smartphone,
   ChevronRight,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/api';
+
 
 export interface SocialConnection {
   platform: 'facebook' | 'instagram' | 'whatsapp' | 'google';
@@ -113,7 +115,7 @@ export const ConnectedAccounts: React.FC = () => {
         const height = 650;
         const left = window.screenX + (window.outerWidth - width) / 2;
         const top = window.screenY + (window.outerHeight - height) / 2;
-        
+
         const popup = window.open(
           `/auth/social-sandbox?platform=${platform}`,
           `Connect ${platform}`,
@@ -268,7 +270,7 @@ export const ConnectedAccounts: React.FC = () => {
 
   return (
     <div className="space-y-6 text-left animate-fade-in" id="connected-accounts-suite">
-      
+
       {/* Page Title Header */}
       <div className="border-b border-slate-100 pb-5">
         <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -282,12 +284,11 @@ export const ConnectedAccounts: React.FC = () => {
 
       {/* Alert Feedbacks */}
       {alert && (
-        <div 
-          className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 border animate-fade-in ${
-            alert.type === 'success' 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-              : 'bg-rose-50 border-rose-200 text-rose-800'
-          }`}
+        <div
+          className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 border animate-fade-in ${alert.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
           id="social-accounts-alert-banner"
         >
           {alert.type === 'success' ? <Check className="h-4.5 w-4.5" /> : <AlertCircle className="h-4.5 w-4.5" />}
@@ -299,21 +300,19 @@ export const ConnectedAccounts: React.FC = () => {
       <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit">
         <button
           onClick={() => setActiveTab('links')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-            activeTab === 'links'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${activeTab === 'links'
+            ? 'bg-white text-slate-900 shadow-sm'
+            : 'text-slate-500 hover:text-slate-800'
+            }`}
         >
           <Link2 className="h-3.5 w-3.5 inline mr-1 text-indigo-600" /> Connected Accounts ({connections.filter(c => c.connected).length})
         </button>
         <button
           onClick={() => setActiveTab('developer')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-            activeTab === 'developer'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${activeTab === 'developer'
+            ? 'bg-white text-slate-900 shadow-sm'
+            : 'text-slate-500 hover:text-slate-800'
+            }`}
         >
           <Sliders className="h-3.5 w-3.5 inline mr-1 text-emerald-600" /> Production Developer Keys
         </button>
@@ -338,8 +337,8 @@ export const ConnectedAccounts: React.FC = () => {
               const PlatformIcon = details.icon;
 
               return (
-                <div 
-                  key={conn.platform} 
+                <div
+                  key={conn.platform}
                   className={`bg-white border rounded-3xl p-6 flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow relative overflow-hidden ${conn.connected ? 'border-indigo-150 ring-1 ring-indigo-50' : 'border-slate-100'}`}
                 >
                   <div className="space-y-3">
@@ -347,10 +346,10 @@ export const ConnectedAccounts: React.FC = () => {
                       <div className="relative">
                         {conn.connected && conn.avatar ? (
                           <div className="relative h-12 w-12 rounded-2xl overflow-hidden border-2 border-indigo-100 ring-2 ring-indigo-50 shadow-xs shrink-0 select-none">
-                            <img 
-                              src={conn.avatar} 
-                              alt={`${details.title} avatar`} 
-                              className="h-full w-full object-cover" 
+                            <img
+                              src={conn.avatar}
+                              alt={`${details.title} avatar`}
+                              className="h-full w-full object-cover"
                             />
                             <span className="absolute bottom-0 right-0 bg-slate-900 p-0.5 rounded-br-xl rounded-tl-md text-white flex items-center justify-center border-t border-l border-white/20">
                               <PlatformIcon className="h-2.5 w-2.5" />
@@ -365,7 +364,7 @@ export const ConnectedAccounts: React.FC = () => {
                           <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
                         )}
                       </div>
-                      
+
                       {conn.connected ? (
                         <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 select-none">
                           <Check className="h-3 w-3" /> Connected
@@ -481,7 +480,7 @@ export const ConnectedAccounts: React.FC = () => {
 
             <form onSubmit={handleSaveDeveloperKeys} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
+
                 {/* Facebook Section */}
                 <div className="space-y-3.5 border border-slate-100 p-4 rounded-2xl bg-slate-50/50">
                   <strong className="text-[10px] uppercase font-black text-blue-600 tracking-widest block flex items-center gap-1">
@@ -490,20 +489,20 @@ export const ConnectedAccounts: React.FC = () => {
                   <div className="space-y-2">
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">Facebook Page ID</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={devConfig.facebookPageId}
-                        onChange={e => setDevConfig({...devConfig, facebookPageId: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, facebookPageId: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="e.g. 1092837465"
                       />
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">Page Access Token</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         value={devConfig.facebookAccessToken}
-                        onChange={e => setDevConfig({...devConfig, facebookAccessToken: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, facebookAccessToken: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="EAABW..."
                       />
@@ -519,10 +518,10 @@ export const ConnectedAccounts: React.FC = () => {
                   <div className="space-y-2">
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">IG Business Account ID</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={devConfig.instagramBusinessId}
-                        onChange={e => setDevConfig({...devConfig, instagramBusinessId: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, instagramBusinessId: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="e.g. 17841400293847"
                       />
@@ -539,20 +538,20 @@ export const ConnectedAccounts: React.FC = () => {
                   <div className="space-y-2">
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">Phone Number ID</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={devConfig.whatsappPhoneId}
-                        onChange={e => setDevConfig({...devConfig, whatsappPhoneId: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, whatsappPhoneId: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="e.g. 1092837465"
                       />
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">System User Access Token</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         value={devConfig.whatsappAccessToken}
-                        onChange={e => setDevConfig({...devConfig, whatsappAccessToken: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, whatsappAccessToken: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="EAABW..."
                       />
@@ -568,20 +567,20 @@ export const ConnectedAccounts: React.FC = () => {
                   <div className="space-y-2">
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">Google Location ID</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={devConfig.googleLocationId}
-                        onChange={e => setDevConfig({...devConfig, googleLocationId: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, googleLocationId: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="accounts/123/locations/456"
                       />
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9.5px] font-black text-slate-500">OAuth Access / Refresh Token</label>
-                      <input 
-                        type="password" 
+                      <input
+                        type="password"
                         value={devConfig.googleAccessToken}
-                        onChange={e => setDevConfig({...devConfig, googleAccessToken: e.target.value})}
+                        onChange={e => setDevConfig({ ...devConfig, googleAccessToken: e.target.value })}
                         className="w-full text-xs font-bold p-2 border border-slate-200 rounded-lg outline-none bg-white focus:border-indigo-500"
                         placeholder="ya29.a0AfH..."
                       />
@@ -596,7 +595,7 @@ export const ConnectedAccounts: React.FC = () => {
                   <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   <span>Encrypted via AES-256</span>
                 </div>
-                
+
                 <button
                   type="submit"
                   disabled={actionLoading === 'save-keys'}
