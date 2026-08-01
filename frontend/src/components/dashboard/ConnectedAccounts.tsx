@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/api';
 
 
+
 export interface SocialConnection {
   platform: 'facebook' | 'instagram' | 'whatsapp' | 'google';
   connected: boolean;
