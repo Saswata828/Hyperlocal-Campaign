@@ -10,8 +10,9 @@ export const API_BASE = (
 
 export const getApiUrl = (path: string): string => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  if (cleanPath.startsWith("/api/")) {
-    return `${API_BASE}${cleanPath.substring(4)}`;
+  if (cleanPath === "/api" || cleanPath.startsWith("/api/")) {
+    const subPath = cleanPath === "/api" ? "" : cleanPath.substring(4);
+    return `${API_BASE}${subPath}`;
   }
   return `${API_BASE}${cleanPath}`;
 };
@@ -62,7 +63,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem("_hyperlocal_access_token");
         localStorage.removeItem("_hyperlocal_refresh_token");
         localStorage.removeItem("_hyperlocal_current_user");
-        
+
         // Force trigger window-wide logout redirect fallback
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("unauthorized-session-expired"));
@@ -80,7 +81,7 @@ const getEmulatedUsers = (): any[] => {
   try {
     const raw = localStorage.getItem("_emulated_users");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   const defaults = [
     {
       email: "saswatamishra828@gmail.com",
@@ -106,7 +107,7 @@ const getEmulatedOtps = (): Record<string, { otp: string; expiresAt: number; reg
   try {
     const raw = localStorage.getItem("_emulated_active_otps");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   return {};
 };
 
@@ -118,7 +119,7 @@ const getEmulatedStores = () => {
   try {
     const raw = localStorage.getItem("_emulated_stores") || localStorage.getItem("adpulse_stores");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   const defaults = [
     {
       id: 'store-1',
@@ -157,7 +158,7 @@ const getEmulatedProducts = () => {
   try {
     const raw = localStorage.getItem("_emulated_products") || localStorage.getItem("adpulse_products");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   const defaults = [
     {
       id: 'prod-1',
@@ -191,7 +192,7 @@ const getEmulatedCampaigns = () => {
   try {
     const raw = localStorage.getItem("_emulated_campaigns") || localStorage.getItem("adpulse_campaigns");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   return [
     {
       id: 'camp-1',
@@ -223,7 +224,7 @@ const getEmulatedCurrentUser = (): any => {
   try {
     const raw = localStorage.getItem("_hyperlocal_current_user");
     if (raw) return JSON.parse(raw);
-  } catch (e) {}
+  } catch (e) { }
   return null;
 };
 
@@ -245,15 +246,15 @@ async function runApi<T>(apiPromise: Promise<T>, emulatedFn: () => Promise<T>): 
   } catch (error: any) {
     const responseData = error.response?.data;
     const isHtml = responseData && typeof responseData === "string" && (
-      responseData.includes("<!DOCTYPE html>") || 
-      responseData.includes("<html") || 
-      responseData.includes("netlify") || 
+      responseData.includes("<!DOCTYPE html>") ||
+      responseData.includes("<html") ||
+      responseData.includes("netlify") ||
       responseData.includes("Page not found")
     );
-    
+
     const isStatic404 = error.response?.status === 404;
     const isConnectionError = !error.response;
-    
+
     if (isHtml || isStatic404 || isConnectionError) {
       console.warn("[API_SERVICE] Client Emulation Engine activated due to server response:", error.message);
       localStorage.setItem("__api_use_client_emulation", "true");
@@ -340,22 +341,22 @@ export const apiService = {
           onboardingStep: "completed"
         };
         saveEmulatedCurrentUser(demoUser);
-        
+
         const users = getEmulatedUsers();
         if (!users.some(u => u.email.toLowerCase() === "demo@merchant.com")) {
           users.push(demoUser);
           saveEmulatedUsers(users);
         }
-        
-        return { 
-          success: true, 
-          accessToken: token, 
+
+        return {
+          success: true,
+          accessToken: token,
           user: {
             id: 1,
             name: "Demo Merchant",
             email: "demo@merchant.com",
             role: "MERCHANT"
-          } 
+          }
         };
       }
     );
@@ -381,17 +382,17 @@ export const apiService = {
         if (!matched) {
           throw { response: { status: 401, data: { message: "Account mapping not found. Please complete profile registration or try again." } } };
         }
-        
+
         // Dynamically initialize password in emulation if none exists
         if (!matched.password) {
           matched.password = credentials.password || "password";
           saveEmulatedUsers(users);
         }
 
-        const isMatch = credentials.password === "password" || 
-                        credentials.password === "Password123!" || 
-                        credentials.password === "123456789" || 
-                        credentials.password === matched.password;
+        const isMatch = credentials.password === "password" ||
+          credentials.password === "Password123!" ||
+          credentials.password === "123456789" ||
+          credentials.password === matched.password;
 
         if (!isMatch) {
           throw { response: { status: 401, data: { message: "Invalid credentials. In local client mode, please use registered password, '123456789', or 'password'." } } };
@@ -411,9 +412,9 @@ export const apiService = {
         const users = getEmulatedUsers();
         const cleanEmail = merchantData.email.trim().toLowerCase();
         const exists = users.some(u => u.email.toLowerCase() === cleanEmail);
-        const isSpecialEmail = cleanEmail === "saswatamishra828@gmail.com" || 
-                               cleanEmail.endsWith("@hyperlocal.ai") ||
-                               cleanEmail.startsWith("demo");
+        const isSpecialEmail = cleanEmail === "saswatamishra828@gmail.com" ||
+          cleanEmail.endsWith("@hyperlocal.ai") ||
+          cleanEmail.startsWith("demo");
         if (exists && !isSpecialEmail) {
           throw { response: { status: 409, data: { message: "Conflict - Merchant account matching this email address already exists." } } };
         }
@@ -425,7 +426,7 @@ export const apiService = {
           registerData: { ...merchantData, enabled: true, onboardingStep: "business" }
         };
         saveEmulatedOtps(otps);
-        
+
         console.log(`[EMULATION-SMTP] Verification code for ${cleanEmail} is ${otpCode}`);
         localStorage.setItem("_dev_latest_otp", otpCode);
         if (typeof window !== "undefined") {
@@ -460,7 +461,7 @@ export const apiService = {
         if (!record || record.otp !== payload.otp) {
           throw { response: { status: 400, data: { message: "Invalid verification OTP. Please try using standard code '123456' inside emulation." } } };
         }
-        
+
         const users = getEmulatedUsers();
         const existingIdx = users.findIndex(u => u.email.toLowerCase() === cleanEmail);
         const newUser = {
@@ -468,21 +469,21 @@ export const apiService = {
           onboarded: false,
           onboardingStep: "business"
         };
-        
+
         if (existingIdx >= 0) {
           users[existingIdx] = newUser;
         } else {
           users.push(newUser);
         }
         saveEmulatedUsers(users);
-        
+
         delete otps[cleanEmail];
         saveEmulatedOtps(otps);
-        
+
         const token = "mock-jwt-access-" + Date.now();
         localStorage.setItem("_hyperlocal_access_token", token);
         saveEmulatedCurrentUser(newUser);
-        
+
         return {
           success: true,
           accessToken: token,
@@ -919,7 +920,7 @@ export const apiService = {
           user.onboardingStep = "completed";
           user.onboarded = true;
           saveEmulatedCurrentUser(user);
-          
+
           const users = getEmulatedUsers();
           const idx = users.findIndex(u => u.email.toLowerCase() === user.email.toLowerCase());
           if (idx >= 0) {
@@ -994,11 +995,11 @@ export const apiService = {
         const festival = params.festival && params.festival !== "None" ? params.festival : "Festive Event";
         const offer = params.offer || "Special 15% discount";
         const language = params.language || "English";
-        
+
         let headline = `Unmissable ${festival} Spark!`;
         let caption = `✨ Elevate your style standard this season with our handcrafted ${prod}. To spread joy, we are introducing a: ${offer}! Valid exclusively for shoppers inside our targeting radius.`;
         let hashtags = ["FestiveMood", "LocalLove", "AdPulseSmartAd", "StoreOffer"];
-        
+
         if (language.toLowerCase().includes("hindi")) {
           headline = `${festival} का सबसे बड़ा धमाका!`;
           caption = `✨ इस त्यौहार के शुभ अवसर पर पाइए हमारे बेहतरीन ${prod} पर ख़ास ऑफर: ${offer}! स्टॉक सीमित है, आज ही नजदीकी स्टोर पर आएं!`;
@@ -1171,8 +1172,8 @@ export const apiService = {
       apiClient.post("/campaigns", campaignData).then(res => res.data),
       async () => {
         const campaigns = getEmulatedCampaigns();
-        const newCamp = { 
-          ...campaignData, 
+        const newCamp = {
+          ...campaignData,
           id: campaignData.id || "camp-" + Date.now(),
           performanceTrend: [100, 150, 220, 280, 410],
           clicks: Math.floor(Math.random() * 200) + 100,
@@ -1246,5 +1247,85 @@ export const apiService = {
         };
       }
     );
+  },
+
+  // --- SOCIAL MEDIA PUBLISHING & CONNECTIONS SERVICES ---
+  async getSocialConnections() {
+    return runApi(
+      apiClient.get("/social/connections").then(res => res.data),
+      async () => {
+        return {
+          success: true,
+          connections: [
+            { platform: "facebook", connected: true, accountName: "AdPulse Dev Labs Page" },
+            { platform: "instagram", connected: true, accountName: "adpulse_official" },
+            { platform: "whatsapp", connected: false },
+            { platform: "google", connected: false }
+          ],
+          credentials: {}
+        };
+      }
+    );
+  },
+
+  async publishSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; bannerUrl?: string }) {
+    return runApi(
+      apiClient.post("/social/publish", payload).then(res => res.data),
+      async () => {
+        const results: Record<string, any> = {};
+        payload.platforms.forEach(p => {
+          results[p] = {
+            status: "simulated",
+            postId: "emu-post-" + Math.floor(Math.random() * 1000000)
+          };
+        });
+        return {
+          success: true,
+          message: "Campaign post published successfully across selected platforms!",
+          results
+        };
+      }
+    );
+  },
+
+  async scheduleSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; scheduledDate: string; bannerUrl?: string }) {
+    return runApi(
+      apiClient.post("/social/schedule", payload).then(res => res.data),
+      async () => {
+        const campaigns = getEmulatedCampaigns();
+        const newScheduled = {
+          id: `camp-sch-${Date.now()}`,
+          name: payload.headline || "Scheduled Campaign",
+          goal: "Social Broadcast",
+          status: "Scheduled",
+          platforms: payload.platforms,
+          generatedCaption: payload.caption,
+          bannerUrl: payload.bannerUrl || "",
+          scheduledDate: payload.scheduledDate,
+          clicks: 0,
+          views: 0
+        };
+        campaigns.push(newScheduled);
+        saveEmulatedCampaigns(campaigns);
+        return {
+          success: true,
+          message: "Campaign post scheduled successfully!",
+          scheduledItem: newScheduled
+        };
+      }
+    );
+  },
+
+  async getSocialOAuthUrl(platform: string) {
+    return runApi(
+      apiClient.get(`/social/oauth-url?platform=${platform}`).then(res => res.data),
+      async () => {
+        return {
+          url: `/auth/social-sandbox?platform=${platform}`,
+          isSandbox: true
+        };
+      }
+    );
   }
 };
+

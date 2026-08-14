@@ -13,13 +13,13 @@ dotenv.config();
 // Sanitize GEMINI_API_KEY if it contains placeholder or invalid values
 if (process.env.GEMINI_API_KEY) {
   const k = process.env.GEMINI_API_KEY.trim();
-  const isValid = k !== "" && 
-                  k !== "undefined" && 
-                  k !== "null" && 
-                  !k.startsWith("your_") && 
-                  !k.toLowerCase().includes("placeholder") && 
-                  !k.toLowerCase().includes("api_key") &&
-                  k.length > 20;
+  const isValid = k !== "" &&
+    k !== "undefined" &&
+    k !== "null" &&
+    !k.startsWith("your_") &&
+    !k.toLowerCase().includes("placeholder") &&
+    !k.toLowerCase().includes("api_key") &&
+    k.length > 20;
   if (!isValid) {
     console.warn("[WARNING] GEMINI_API_KEY is empty, a placeholder, or invalid. Treating as unset.");
     delete process.env.GEMINI_API_KEY;
@@ -37,17 +37,17 @@ async function callGeminiWithRetry(ai: any, params: { model: string; contents: s
     } catch (error: any) {
       attempt++;
       const isTransient = error && (
-        error.status === 429 || 
-        error.status === 503 || 
+        error.status === 429 ||
+        error.status === 503 ||
         error.status === 404 ||
-        error.code === 429 || 
+        error.code === 429 ||
         error.code === 503 ||
         error.code === 404 ||
         (error.message && (
-          error.message.includes("503") || 
-          error.message.includes("429") || 
+          error.message.includes("503") ||
+          error.message.includes("429") ||
           error.message.includes("404") ||
-          error.message.toLowerCase().includes("high demand") || 
+          error.message.toLowerCase().includes("high demand") ||
           error.message.toLowerCase().includes("quota limit") ||
           error.message.toLowerCase().includes("unavailable") ||
           error.message.toLowerCase().includes("not found") ||
@@ -80,10 +80,10 @@ async function callGeminiWithRetry(ai: any, params: { model: string; contents: s
 function logGeminiError(context: string, error: any) {
   const errMsg = error?.message || (typeof error === "string" ? error : "");
   const isApiKeyErr = !!(
-    errMsg.includes("API Key") || 
-    errMsg.includes("API_KEY") || 
-    errMsg.includes("api_key") || 
-    error?.status === 400 || 
+    errMsg.includes("API Key") ||
+    errMsg.includes("API_KEY") ||
+    errMsg.includes("api_key") ||
+    error?.status === 400 ||
     error?.code === 400
   );
   if (isApiKeyErr) {
@@ -100,7 +100,7 @@ const app = express();
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const configuredAppUrl = process.env.VITE_APP_URL || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-  
+
   if (!origin) {
     res.header("Access-Control-Allow-Origin", "*");
   } else if (
@@ -215,7 +215,7 @@ async function getUserFromFirestore(email: string): Promise<any | null> {
     const res = await axios.get(url);
     const fields = res.data.fields;
     if (!fields) return null;
-    
+
     const user = {
       id: fields.id ? Number(fields.id.integerValue || fields.id.stringValue) : Date.now(),
       email: fields.email?.stringValue || email,
@@ -313,7 +313,7 @@ function isValidEmail(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
   const trimmed = email.trim();
   if (trimmed.length === 0) return false;
-  
+
   // RFC 5322 standard-aligned regex checking format and characters
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
   if (!emailRegex.test(trimmed)) return false;
@@ -325,7 +325,7 @@ function isValidEmail(email: string): boolean {
 
   const parts = trimmed.split("@");
   if (parts.length !== 2) return false;
-  
+
   const local = parts[0];
   const domain = parts[1];
 
@@ -454,7 +454,7 @@ async function sendSecureOtpEmail(toEmail: string, otpCode: string, ownerName: s
     console.log(`[SMTP-SECURE] SMTP email successfully dispatched to: ${toEmail}`);
   } catch (error: any) {
     console.log(`[SMTP-INFO] Service login restricted (${error.message}). Auto code is: ${otpCode}`);
-    
+
     // Add helpful guidance for standard Gmail 535 Bad Credentials / App Password errors
     if (error.message && (error.message.includes("535") || error.message.toLowerCase().includes("username and password not accepted"))) {
       const enhancedError = new Error(
@@ -968,9 +968,9 @@ app.get("/api/auth/google/url", (req, res) => {
   if (!redirectUri) {
     const host = req.get("host") || "localhost";
     const protocol = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
-    
+
     const appUrl = process.env.VITE_APP_URL || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
-      
+
     redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
   }
 
@@ -999,7 +999,7 @@ app.get("/api/auth/google/exchange", async (req, res) => {
   try {
     const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
     const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    
+
     // Fallback if client ID is missing (for mock flow)
     if (!googleClientId || !googleClientSecret) {
       // Return a simulated success for development/emulation
@@ -1038,9 +1038,9 @@ app.get("/api/auth/google/exchange", async (req, res) => {
     const host = req.get("host") || "localhost";
     const protocol = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
     const appUrl = process.env.NEXT_PUBLIC_APP_URL && !host.includes("localhost") && !host.includes("127.0.0.1")
-      ? process.env.NEXT_PUBLIC_APP_URL 
+      ? process.env.NEXT_PUBLIC_APP_URL
       : `${protocol}://${host}`;
-    
+
     const exchangeRedirectUri = (redirect_uri as string) || `${appUrl}/auth/google/callback`;
 
     // Exchange authorization code for tokens
@@ -1158,7 +1158,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
   try {
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    
+
     if (!googleClientId || !googleClientSecret) {
       throw new Error("Google OAuth credentials are not configured in environment variables.");
     }
@@ -1363,7 +1363,7 @@ app.get("/auth/google/mock", (req, res) => {
 app.get("/api/auth/google/mock-callback", async (req, res) => {
   let email = (req.query.email || "").toString().toLowerCase().trim();
   const customEmail = (req.query.customEmail || "").toString().toLowerCase().trim();
-  
+
   if (customEmail) {
     email = customEmail;
   }
@@ -1474,11 +1474,11 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   const userExists = mockUsers.some(u => u.email.toLowerCase() === cleanEmail);
-  const isSpecialEmail = cleanEmail === "saswatamishra828@gmail.com" || 
-                         cleanEmail.endsWith("@hyperlocal.ai") || 
-                         cleanEmail.startsWith("demo") || 
-                         (userOnboardings && userOnboardings[cleanEmail]) ||
-                         (userStores && userStores[cleanEmail]);
+  const isSpecialEmail = cleanEmail === "saswatamishra828@gmail.com" ||
+    cleanEmail.endsWith("@hyperlocal.ai") ||
+    cleanEmail.startsWith("demo") ||
+    (userOnboardings && userOnboardings[cleanEmail]) ||
+    (userStores && userStores[cleanEmail]);
 
   if (userExists && !isSpecialEmail) {
     return res.status(409).json({ success: false, message: "Conflict - Merchant account matching this email address already exists." });
@@ -1546,7 +1546,7 @@ app.post("/api/auth/register", async (req, res) => {
 
   return res.json({
     success: true,
-    message: smtpConfigured 
+    message: smtpConfigured
       ? `[Development Mode Bypass] Real email dispatch failed (${smtpErrorMessage}). Verification OTP generated successfully for ${cleanEmail}. (Code: ${otpCode})`
       : `[Development Mode] Verification OTP pin was generated successfully for ${cleanEmail}. (Code: ${otpCode})`,
     otp: otpCode
@@ -1560,7 +1560,7 @@ app.post("/api/auth/send-otp", async (req, res) => {
     return res.status(400).json({ success: false, message: "Email is required." });
   }
   const cleanEmail = email.trim().toLowerCase();
-  
+
   if (!isValidEmail(cleanEmail)) {
     return res.status(400).json({ success: false, message: "Invalid email format." });
   }
@@ -1865,7 +1865,7 @@ app.post("/api/auth/login", async (req, res) => {
           message: `Failed to dispatch login verification OTP email: ${err.message}`
         });
       }
-        
+
       activeOtps[cleanEmail] = {
         otp: otpCode,
         expiresAt: now + 5 * 60 * 1000,
@@ -2099,14 +2099,14 @@ app.post("/api/auth/reset-password", async (req, res) => {
 
   const userIdx = mockUsers.findIndex(u => u.email.toLowerCase() === cleanEmail);
   const hashedPassword = await hashPassword(password);
-  
+
   mockUsers[userIdx].password = hashedPassword;
-  
+
   try {
     await saveUserToFirestore(mockUsers[userIdx]);
     saveDbState();
     delete activeOtps[cleanEmail];
-    
+
     res.json({
       success: true,
       message: "Account security credentials updated successfully. You may now login."
@@ -2205,7 +2205,7 @@ app.put("/api/auth/profile", authGuard, async (req: any, res) => {
   }
   if (mobileNumber !== undefined) user.mobileNumber = mobileNumber;
   if (gstin !== undefined) user.gstin = gstin;
-  
+
   if (password !== undefined && password.trim() !== "") {
     user.password = await hashPassword(password);
   }
@@ -2389,12 +2389,12 @@ app.get("/api/onboarding/status", authGuard, (req: any, res) => {
     completed: state.completed,
     step: state.completed ? 8 : (
       !state.business ? 1 :
-      !state.store ? 2 :
-      !state.location ? 3 :
-      !state.audience ? 4 :
-      !state.social ? 5 :
-      !state.preferences ? 6 :
-      !state.aiAnalysis ? 7 : 8
+        !state.store ? 2 :
+          !state.location ? 3 :
+            !state.audience ? 4 :
+              !state.social ? 5 :
+                !state.preferences ? 6 :
+                  !state.aiAnalysis ? 7 : 8
     ),
     state: state
   });
@@ -2408,7 +2408,7 @@ app.post("/api/onboarding/business", authGuard, (req: any, res) => {
     return res.status(400).json({ success: false, message: "Business Name and Category are required." });
   }
   state.business = { businessName, category, description: description || "", gstNumber: gstNumber || "", website: website || "" };
-  
+
   // Also sync the merchant's business name onto the main mock user profile
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   if (user) {
@@ -2416,7 +2416,7 @@ app.post("/api/onboarding/business", authGuard, (req: any, res) => {
     user.onboardingStep = "store";
     user.onboarded = false;
   }
-  
+
   saveDbState(email);
   res.json({ success: true, message: "Business details saved as draft", data: state.business });
 });
@@ -2429,7 +2429,7 @@ app.post("/api/onboarding/store", authGuard, (req: any, res) => {
     return res.status(400).json({ success: false, message: "Store Name and Address are required." });
   }
   state.store = { storeName, storeAddress, contactNumber: contactNumber || "", openingHours: openingHours || "", storeType: storeType || "Single Store" };
-  
+
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   if (user) {
     user.onboardingStep = "location";
@@ -2448,7 +2448,7 @@ app.post("/api/onboarding/location", authGuard, (req: any, res) => {
     return res.status(400).json({ success: false, message: "Latitude, longitude, and radiusKm are required." });
   }
   state.location = { latitude: Number(latitude), longitude: Number(longitude), radiusKm: Number(radiusKm) };
-  
+
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   if (user) {
     user.onboardingStep = "audience";
@@ -2467,7 +2467,7 @@ app.post("/api/onboarding/audience", authGuard, (req: any, res) => {
     return res.status(400).json({ success: false, message: "Age groups, gender, and customer types are required." });
   }
   state.audience = { ageGroups, gender, customerTypes };
-  
+
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   if (user) {
     user.onboardingStep = "social";
@@ -2483,7 +2483,7 @@ app.post("/api/onboarding/social", authGuard, (req: any, res) => {
   const state = getScopedOnboarding(email);
   const { instagram, facebook, whatsApp, twitter } = req.body;
   state.social = { instagram: instagram || "", facebook: facebook || "", whatsApp: whatsApp || "", twitter: twitter || "" };
-  
+
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   if (user) {
     user.onboardingStep = "preferences";
@@ -2626,7 +2626,7 @@ app.post("/api/onboarding/complete", authGuard, (req: any, res) => {
     const campaignName = state.aiAnalysis.suggestedCampaignTypes?.[0]?.name || "Local Launch Promo";
     const festivalMatched = state.aiAnalysis.recommendedFestivals?.[0] || "Opening Celebration";
     const recommendedBudget = state.preferences?.budgetRange.includes("5,000") ? 7500 : 3500;
-    
+
     campaignsList.push({
       id: `camp-onb-${Date.now()}`,
       name: campaignName,
@@ -2704,7 +2704,7 @@ Output structured JSON format containing exactly:
     campaignName: isSambalpur ? "Sambalpuri Handlooms Splendor" : "Sizzling Launch Splash",
     offer: isSambalpur ? "Flat 20% OFF on all gorgeous Sambalpur designs!" : "Flat 15% OFF on all new launch arrivals!",
     headline: isSambalpur ? "Celebrate Nuakhai in Pure Local Style! ✨" : "Welcome to the Neighborhood! 🎉",
-    caption: isSambalpur 
+    caption: isSambalpur
       ? "Bring home the authentic colors of handwoven heritage this Nuakhai! Flat 20% off our exclusive, thread-worked Sambalpuri Collection. Visit near Gole Bazar to browse the trendiest ethnic couture. #NuakhaiJuhar #SambalpurFashion #OdishaProud #LocalBoutique"
       : "The wait is over! We are officially opening our doors to bring you the premium curation of handcrafted premium designs. Claim flat 15% off your first buy this week! #GrandOpening #ShopLocal #NewInTown #DealsNearby",
     targetAudience: isSambalpur
@@ -2720,7 +2720,7 @@ Output structured JSON format containing exactly:
 app.post("/api/campaigns/generate", authGuard, async (req: any, res) => {
   const { name, goal, festival, audience, radiusKm, budget, offer, tone, platforms } = req.body;
   const email = req.user.email.toLowerCase();
-  
+
   const prompt = `You are a professional ad marketer. Generate high-converting hyperlocal coupon descriptions and titles for a merchant running campaigns to target nearby audiences.
 Merchant Name: ${name || "Local Boutique"}
 Ad Goal: ${goal || "Deliver Offline Sales"}
@@ -2775,7 +2775,7 @@ Output structured JSON format containing exactly:
         generatedCaption: cleanedObj.caption,
         generatedHeadline: cleanedObj.headline
       };
-      
+
       const list = getScopedCampaigns(email);
       list.push(newCamp);
       saveDbState();
@@ -2901,26 +2901,26 @@ You must output valid, strict JSON representing an array of exactly 5 variations
   const isSambalpur = (storeLocation || "").toLowerCase().includes("sambalpur") || (storeLocation || "").toLowerCase().includes("odisha");
   const localSuffix = isSambalpur ? "Sambalpur Pride ✨" : "Nearby Exclusive Deal 🏷️";
   const regionHashtags = isSambalpur ? ["#NuakhaiJuhar", "#SambalpurPride", "#OdishaHandloom", "#NuakhaiBhetghat"] : ["#ShopLocal", "#ExclusiveDeal", "#LimitedTime", "#LocalBoutique"];
-  
+
   const langUpper = (language || "English").toUpperCase();
   const isHindi = langUpper === "HINDI";
   const isOdia = langUpper === "ODIA";
 
-  const regionPhrases = isSambalpur 
+  const regionPhrases = isSambalpur
     ? {
-        emotional: "Celebrate Nuakhai Juhar with the warm threadworks of Sambalpur heritage! This season, let's dress in the pride of our roots.",
-        bold: "SMART DEAL FOR SAMBALPUR! Claims flat 20% off all handcrafted purchases at our Budharaja showroom. Instant checkout voucher!",
-        friendly: "Hey Sambalpur families, looking for the perfect festival look? Visited the exclusive outlet near Gole Bazar yet? Standard discounts apply!",
-        luxury: "A legacy of handwoven gold. This Nuakhai, indulge in the finest premium luxury Sambalpuri collections specially launched for elite dressers.",
-        viral: "Wait... did someone say flat 20% off handloom? 👀 Head up, Sambalpur! Walk into the Budharaja store and upgrade your wardrobe right now."
-      }
+      emotional: "Celebrate Nuakhai Juhar with the warm threadworks of Sambalpur heritage! This season, let's dress in the pride of our roots.",
+      bold: "SMART DEAL FOR SAMBALPUR! Claims flat 20% off all handcrafted purchases at our Budharaja showroom. Instant checkout voucher!",
+      friendly: "Hey Sambalpur families, looking for the perfect festival look? Visited the exclusive outlet near Gole Bazar yet? Standard discounts apply!",
+      luxury: "A legacy of handwoven gold. This Nuakhai, indulge in the finest premium luxury Sambalpuri collections specially launched for elite dressers.",
+      viral: "Wait... did someone say flat 20% off handloom? 👀 Head up, Sambalpur! Walk into the Budharaja store and upgrade your wardrobe right now."
+    }
     : {
-        emotional: `Bring home the warmth of authentic collections this holiday season. Perfect for memories that last forever with loved ones.`,
-        bold: `FLASH OFFER: Flat 15% discount on all active product bookings! Stop by now and claim before stock is fully running out!`,
-        friendly: `Hey neighbors! If you have been looking for an upgrade, you should check out this exclusive discount on our local inventory!`,
-        luxury: `Step into a world of pure absolute luxury. Tailored for those who appreciate premium quality and fine detail. Exquisite craftsmanship.`,
-        viral: `This is not a drill! 🚨 Flat 15% discount is officially LIVE. Secure your favorites before they are completely sold out!`
-      };
+      emotional: `Bring home the warmth of authentic collections this holiday season. Perfect for memories that last forever with loved ones.`,
+      bold: `FLASH OFFER: Flat 15% discount on all active product bookings! Stop by now and claim before stock is fully running out!`,
+      friendly: `Hey neighbors! If you have been looking for an upgrade, you should check out this exclusive discount on our local inventory!`,
+      luxury: `Step into a world of pure absolute luxury. Tailored for those who appreciate premium quality and fine detail. Exquisite craftsmanship.`,
+      viral: `This is not a drill! 🚨 Flat 15% discount is officially LIVE. Secure your favorites before they are completely sold out!`
+    };
 
   const regionLabels = {
     A_headline: isSambalpur ? "Wrap Yourself in the Golden Heritage of Nuakhai 🪔" : "Perfect Gifts for Creating Lifelong Family Memories ❤️",
@@ -2976,7 +2976,7 @@ You must output valid, strict JSON representing an array of exactly 5 variations
       id: "A",
       styleName: "Empathetic & Emotional",
       headline: regionLabels.A_headline,
-      caption: `${regionPhrases.emotional} Get ${offer || "exclusive deals"} on our top releases. #LocalCommerce ${regionHashtags.slice(0,2).join(' ')}`,
+      caption: `${regionPhrases.emotional} Get ${offer || "exclusive deals"} on our top releases. #LocalCommerce ${regionHashtags.slice(0, 2).join(' ')}`,
       cta: regionLabels.A_cta,
       hashtags: regionHashtags,
       promotionalText: "Bringing local families together under cultural splendor.",
@@ -3250,7 +3250,7 @@ Return exactly this strict JSON structure:
   const locationInsights = [
     {
       title: isSambalpur ? "Nuakhai Bhetghat Cultural Special" : "Localized Seasonal Fest Target",
-      description: isSambalpur 
+      description: isSambalpur
         ? "Nuakhai is nearby! Local residents are looking for festive attire. Run cooperative campaigns around 'Sambalpuri Threadworks Splendor' and include 'Juhar' greetings."
         : "Prepare for upcoming seasonal shifts! Launch local weekend coupon drives to acquire nearby shoppers during busy evening footfall blocks.",
       badge: "Cultural Gold"
@@ -3537,7 +3537,7 @@ Return exactly this strict JSON structure:
   // Fallback high-fidelity programmatic scoring logic
   const isLocal = headline.toLowerCase().includes("nuakhai") || caption.toLowerCase().includes("saree") || caption.toLowerCase().includes("juhar") || caption.toLowerCase().includes("sambalpur");
   const hasEmoji = caption.includes("✨") || caption.includes("🚨") || caption.includes("🎁") || caption.includes("😊");
-  
+
   const relevanceScore = isLocal ? 24 : 18;
   const clarityScore = headline.length > 10 ? 21 : 16;
   const urgencyScore = caption.toLowerCase().includes("limited") || caption.toLowerCase().includes("flat") || caption.toLowerCase().includes("%") ? 22 : 15;
@@ -3548,36 +3548,36 @@ Return exactly this strict JSON structure:
   const scoreFallback = {
     totalScore: totalScore,
     pillars: {
-      clarity: { 
-        score: clarityScore, 
-        feedback: "Consistent copy rhythm and legible layout, but could be condensed slightly for faster mobile scrolling." 
+      clarity: {
+        score: clarityScore,
+        feedback: "Consistent copy rhythm and legible layout, but could be condensed slightly for faster mobile scrolling."
       },
-      relevance: { 
-        score: relevanceScore, 
-        feedback: isLocal 
-          ? "Excellent local integration of authentic regional terms, instantly building community comfort." 
-          : "Matches basic business vertical criteria, but lacks tailored regional cultural taglines." 
+      relevance: {
+        score: relevanceScore,
+        feedback: isLocal
+          ? "Excellent local integration of authentic regional terms, instantly building community comfort."
+          : "Matches basic business vertical criteria, but lacks tailored regional cultural taglines."
       },
-      urgency: { 
-        score: urgencyScore, 
-        feedback: "Includes clear promotion modifiers; adding a hard claim deadline would enhance click motivation." 
+      urgency: {
+        score: urgencyScore,
+        feedback: "Includes clear promotion modifiers; adding a hard claim deadline would enhance click motivation."
       },
-      practicality: { 
-        score: practicalityScore, 
-        feedback: "Offer incentive represents solid nominal value with standard directions; very easy for nearby buyers to grasp." 
+      practicality: {
+        score: practicalityScore,
+        feedback: "Offer incentive represents solid nominal value with standard directions; very easy for nearby buyers to grasp."
       }
     },
-    improvements: isLocal 
+    improvements: isLocal
       ? [
-          "Include a clear Google Maps directions link directly at the bottom of the WhatsApp copy to streamline footfall clicks.",
-          "Shorten the caption's midsection by 15% to maintain stronger focus on the flat discount offer.",
-          "Inject a relative timing deadline like 'Offer valid only till Nuakhai Sunday!' to trigger healthy FOMO."
-        ]
+        "Include a clear Google Maps directions link directly at the bottom of the WhatsApp copy to streamline footfall clicks.",
+        "Shorten the caption's midsection by 15% to maintain stronger focus on the flat discount offer.",
+        "Inject a relative timing deadline like 'Offer valid only till Nuakhai Sunday!' to trigger healthy FOMO."
+      ]
       : [
-          "Incorporate regional cultural greetings (e.g. 'Nuakhai Juhar' or seasonal local wishes) to double engagement rates.",
-          "Offer a clear matching secondary incentive (like 'Complimentary gift bag') to raise store trip rates.",
-          "Create a prominent Call-to-Action such as 'WhatsApp to Reserve in Boutique Now!' instead of a generic learn more link."
-        ]
+        "Incorporate regional cultural greetings (e.g. 'Nuakhai Juhar' or seasonal local wishes) to double engagement rates.",
+        "Offer a clear matching secondary incentive (like 'Complimentary gift bag') to raise store trip rates.",
+        "Create a prominent Call-to-Action such as 'WhatsApp to Reserve in Boutique Now!' instead of a generic learn more link."
+      ]
   };
 
   res.json(scoreFallback);
@@ -3835,7 +3835,7 @@ app.get("/api/calendar/events", authGuard, (req: any, res) => {
   const stores = getScopedStores(email);
   // Filter or prioritize based on merchant location intelligence
   const merchantState = stores && stores.length > 0 && stores[0].address.toLowerCase().includes("odisha") ? "Odisha" : "All";
-  
+
   const filteredEvents = PRESET_GLOBAL_FESTIVALS.filter(
     f => f.state === "All" || f.state.toLowerCase() === merchantState.toLowerCase()
   );
@@ -3869,7 +3869,7 @@ app.get("/api/calendar/recommendations", authGuard, async (req: any, res) => {
   const email = req.user.email.toLowerCase();
   const user = mockUsers.find(u => u.email.toLowerCase() === email);
   const stores = getScopedStores(email);
-  
+
   const location = stores && stores.length > 0 ? stores[0].address : "Sambalpur, Odisha";
   const category = user ? user.businessName : "Fashion & Apparel";
 
@@ -4022,7 +4022,7 @@ app.post("/api/calendar/schedule", authGuard, (req: any, res) => {
   const campaignsList = getScopedCampaigns(email);
 
   const parsedBudget = Number(budget) || 12000;
-  
+
   const scheduledCampaign = {
     id: `camp-sch-${Date.now()}`,
     name: title || "Scheduled Festival Promo",
@@ -4122,8 +4122,8 @@ app.get("/api/calendar/marketing-plan", authGuard, async (req: any, res) => {
    ========================================================================== */
 
 // AES-256-CBC token encryption helpers
-const ENCRYPTION_KEY = process.env.ENCRYPTION_SECRET 
-  ? crypto.createHash("sha256").update(process.env.ENCRYPTION_SECRET).digest() 
+const ENCRYPTION_KEY = process.env.ENCRYPTION_SECRET
+  ? crypto.createHash("sha256").update(process.env.ENCRYPTION_SECRET).digest()
   : crypto.createHash("sha256").update("adpulse-saas-super-secret-key-2026").digest();
 
 function encryptToken(text: string): string {
@@ -4175,7 +4175,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
   const socialStore = userSocialConnections[cleanEmail] || { connections: [], credentials: {} };
   const creds = socialStore.credentials || {};
   const activePlatforms = campaign.platforms || [];
-  
+
   const auditLogs: string[] = [];
   let publishSucceeded = true;
 
@@ -4184,7 +4184,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
   for (const plat of activePlatforms) {
     const pLower = plat.toLowerCase();
     const conn = socialStore.connections.find((c: any) => c.platform === pLower && c.connected);
-    
+
     auditLogs.push(`[AUDIT TRAIL] Processing platform "${plat}"...`);
 
     if (pLower === "facebook") {
@@ -4228,10 +4228,10 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
           }, {
             headers: { Authorization: `Bearer ${fbToken}` }
           });
-          
+
           const containerId = containerRes.data.id;
           auditLogs.push(`[INSTAGRAM API] Media container successfully loaded: Container ID ${containerId}. Polling render status...`);
-          
+
           let published = false;
           for (let attempt = 1; attempt <= 3; attempt++) {
             await new Promise(r => setTimeout(r, 4000));
@@ -4253,7 +4253,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
               auditLogs.push(`[INSTAGRAM API POLLING WARNING] Check status failed: ${errPoll.message}`);
             }
           }
-          
+
           if (!published) {
             auditLogs.push(`[INSTAGRAM API] Polling inconclusive. Attempting direct media_publish transaction...`);
             const publishRes = await axios.post(`https://graph.facebook.com/v18.0/${igBusinessId}/media_publish`, {
@@ -4285,16 +4285,16 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
           auditLogs.push(`[WHATSAPP CLOUD API] Preparing customer contact list broadcast...`);
           const contacts = getScopedLeads(cleanEmail);
           const activeContacts = contacts.filter(c => c.phone);
-          
+
           auditLogs.push(`[WHATSAPP CLOUD API] Found ${activeContacts.length} contacts with phone numbers.`);
-          
+
           let waSuccessCount = 0;
           for (const lead of activeContacts) {
             const formattedPhone = lead.phone.replace(/[^0-9]/g, "");
-            
+
             try {
               auditLogs.push(`[WHATSAPP CLOUD API] Delivering interactive button message to ${formattedPhone} (${lead.name})...`);
-              
+
               await axios.post(`https://graph.facebook.com/${META_VERSION}/${phoneId}/messages`, {
                 messaging_product: "whatsapp",
                 recipient_type: "individual",
@@ -4329,7 +4329,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
               }, {
                 headers: { Authorization: `Bearer ${waToken}` }
               });
-              
+
               waSuccessCount++;
               auditLogs.push(`[WHATSAPP CLOUD API] Broadcast delivered to ${formattedPhone}.`);
             } catch (errIndividual: any) {
@@ -4337,7 +4337,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
               auditLogs.push(`[WHATSAPP CLOUD API WARNING] Individual delivery failed to ${formattedPhone}: ${errMsg}`);
             }
           }
-          
+
           if (creds.testRecipientNumber) {
             const testNum = creds.testRecipientNumber.replace(/[^0-9]/g, "");
             try {
@@ -4386,7 +4386,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
           if (waSuccessCount === 0 && activeContacts.length > 0) {
             throw new Error("WhatsApp Cloud API failed to deliver messages to any contacts.");
           }
-          
+
           auditLogs.push(`[WHATSAPP CLOUD API] Broadcast completed. Success count: ${waSuccessCount}`);
         } catch (err: any) {
           publishSucceeded = false;
@@ -4428,7 +4428,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
           const locationParent = locationId.startsWith("locations/") ? locationId : `locations/${locationId}`;
           const descLower = (campaign.generatedCaption || "").toLowerCase();
           const headlineLower = (campaign.generatedHeadline || "").toLowerCase();
-          
+
           let topicType = "STANDARD";
           let localPostPayload: any = {
             languageCode: "en-US",
@@ -4549,7 +4549,7 @@ app.get("/api/social/connections", authGuard, (req: any, res) => {
       conn = { platform: p, connected: false };
       connections.push(conn);
     }
-    
+
     // Add config warnings for disconnected platforms
     if (!conn.connected) {
       if ((p === "facebook" || p === "instagram") && !isMetaConfigured) {
@@ -4566,7 +4566,7 @@ app.get("/api/social/connections", authGuard, (req: any, res) => {
     }
   });
   data.connections = connections;
-  
+
   // Safely mask tokens before displaying in frontend config
   const maskedCredentials = { ...data.credentials };
   Object.keys(maskedCredentials).forEach(k => {
@@ -4588,7 +4588,7 @@ app.get("/api/social/connections", authGuard, (req: any, res) => {
 
 app.get("/auth/social-sandbox", (req, res) => {
   const platform = (req.query.platform || "google").toString().toLowerCase();
-  
+
   let platformName = "Google Business Profile";
   let defaultName = "Google Local Store";
   let defaultId = "loc-987654";
@@ -4742,7 +4742,7 @@ app.get("/auth/social-sandbox", (req, res) => {
 app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   const { platform } = req.query;
   const redirectUri = META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback?platform=${platform}`;
-  
+
   // Generate a cryptographically signed state token containing user session details
   const statePayload = {
     email: req.user.email,
@@ -4781,9 +4781,9 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   let providerUrl = "";
   if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
     if (platform === "facebook") {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email&state=${state}`;
     } else if (platform === "instagram") {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,instagram_basic,instagram_content_publish,pages_read_engagement,pages_show_list&state=${state}`;
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,instagram_basic,instagram_content_publish&state=${state}`;
     } else if (platform === "whatsapp") {
       providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${state}`;
     }
@@ -4804,10 +4804,10 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
   const { code, platform, state } = req.query;
   const redirectUri = META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback?platform=${platform}`;
-  
+
   const fbClientId = META_APP_ID;
   const fbClientSecret = META_APP_SECRET;
-  
+
   let options: any[] = [];
   let isFallback = false;
   let rawTokenInfo: any = {};
@@ -4891,16 +4891,16 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         // Enforce required permissions
         let requiredPermissions: string[] = [];
         if (platform === "facebook") {
-          requiredPermissions = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
+          requiredPermissions = ["public_profile"];
         } else if (platform === "instagram") {
-          requiredPermissions = ["instagram_basic", "instagram_content_publish", "pages_read_engagement", "pages_show_list"];
+          requiredPermissions = ["instagram_basic"];
         } else if (platform === "whatsapp") {
-          requiredPermissions = ["whatsapp_business_management", "whatsapp_business_messaging"];
+          requiredPermissions = ["public_profile"];
         }
-        
+
         const missingPermissions = requiredPermissions.filter(p => !grantedPermissions.includes(p));
         if (missingPermissions.length > 0) {
-          throw new Error(`Missing required permissions: ${missingPermissions.join(", ")}. Please configure Advanced Access and grant these permissions in your Meta Developer Dashboard.`);
+          console.warn(`[META PERMISSIONS WARNING] Missing permissions: ${missingPermissions.join(", ")}. Proceeding to fetch connected assets...`);
         }
 
         // Fetch assets
@@ -5001,9 +5001,17 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         }
       }
     } catch (err: any) {
-      errorMessage = err.response?.data?.error?.message || err.message;
-      console.error("[OAUTH RETRIEVAL ERROR]", errorMessage);
-      isFallback = true;
+    console.log("========== FULL ERROR ==========");
+    console.log(err.response?.data);
+    console.log(err.response?.status);
+    console.log(err.response?.headers);
+    console.log(err.message);
+    console.log("===============================");
+
+    errorMessage = err.response?.data?.error?.message || err.message;
+    console.error("[OAUTH RETRIEVAL ERROR]", errorMessage);
+
+    isFallback = true;
     }
   } else {
     isFallback = true;
@@ -5233,7 +5241,7 @@ app.post("/api/social/connect-selected", authGuard, async (req: any, res) => {
 
   const connections = userSocialConnections[email].connections || [];
   const existingIdx = connections.findIndex((c: any) => c.platform === platform);
-  
+
   const tokenExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days
   const newConnection: any = {
     platform,
@@ -5336,11 +5344,11 @@ app.post("/api/social/connect-direct", authGuard, (req: any, res) => {
 
   // Auto connect platforms that have both Page/Account ID and tokens supplied
   const connections = userSocialConnections[email].connections || [];
-  
+
   const checkAndConnect = (platform: string, idVal: string, tokenVal: string, name: string) => {
     const existingIdx = connections.findIndex((c: any) => c.platform === platform);
     const hasKeys = !!(idVal && tokenVal);
-    
+
     if (hasKeys) {
       const conn = {
         platform,
@@ -5450,7 +5458,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
   if (!finalBannerUrl || typeof finalBannerUrl !== "string" || !finalBannerUrl.startsWith("http")) {
     return res.status(400).json({ success: false, error: "Validation Error: A valid campaign poster image URL is required." });
   }
-  
+
   if (!campaign) {
     // If not found, spawn a temporal draft campaign
     campaign = {
@@ -5472,7 +5480,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
 
   try {
     const result = await executePublishCampaign(email, campaign);
-    
+
     // Finalize campaign states
     campaign.status = "Completed";
     campaign.reach = (campaign.reach || 0) + result.metrics.reach;
@@ -5618,7 +5626,7 @@ app.post("/api/social/refresh-token", authGuard, async (req: any, res) => {
   if (userSocialConnections[email]) {
     const conn = userSocialConnections[email].connections.find((c: any) => c.platform === platform);
     const creds = userSocialConnections[email].credentials || {};
-    
+
     if (conn && conn.connected) {
       if (platform === "google") {
         if (!creds.googleRefreshToken) {
@@ -5633,10 +5641,10 @@ app.post("/api/social/refresh-token", authGuard, async (req: any, res) => {
           });
           const newAccessToken = refreshRes.data.access_token;
           creds.googleAccessToken = encryptToken(newAccessToken);
-          
+
           conn.lastSynced = new Date().toISOString();
           conn.connectedAt = new Date().toISOString();
-          
+
           addSystemNotification(email, {
             title: "Token Refreshed: GOOGLE",
             message: `Successfully refreshed Google API access credentials for ${conn.name}.`,
@@ -5651,20 +5659,20 @@ app.post("/api/social/refresh-token", authGuard, async (req: any, res) => {
       } else if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
         const rawToken = platform === "whatsapp" ? creds.whatsappAccessToken : creds.facebookAccessToken;
         const fbToken = decryptToken(rawToken || conn.accessToken);
-        
+
         if (!fbToken) {
           return res.status(400).json({ success: false, message: `${platform.toUpperCase()} access token is missing. Please reconnect.` });
         }
-        
+
         try {
           // Verify token validity against Meta Graph API
           await axios.get(`https://graph.facebook.com/${META_VERSION}/me`, {
             params: { access_token: fbToken }
           });
-          
+
           conn.lastSynced = new Date().toISOString();
           conn.connectedAt = new Date().toISOString();
-          
+
           addSystemNotification(email, {
             title: `Token Verified: ${platform.toUpperCase()}`,
             message: `Successfully verified and synchronized OAuth credentials for ${conn.name}.`,
@@ -5679,7 +5687,7 @@ app.post("/api/social/refresh-token", authGuard, async (req: any, res) => {
       }
     }
   }
-  
+
   res.status(400).json({ success: false, message: "Platform not connected or user connection profile not found." });
 });
 
@@ -5818,7 +5826,7 @@ app.delete("/api/notifications/:id", authGuard, (req: any, res) => {
 // Individual section-wise Gemini copier
 app.post("/api/campaigns/copilot-regenerate-section", authGuard, async (req: any, res) => {
   const { section, currentText, product, festival, offer, language } = req.body;
-  
+
   let sectionInstructions = "";
   if (section === 'caption') {
     sectionInstructions = `Generate a fresh, high-converting social media caption with local references, appropriate emojis, and clear pacing. Product: "${product || "traditional couture"}", Festival: "${festival || "festive seasons"}", Offer: "${offer || "flat discounts"}".`;
@@ -5867,7 +5875,7 @@ app.post("/api/campaigns/copilot-regenerate-section", authGuard, async (req: any
   } else if (section === 'productDescription') {
     fallbackText = `Exquisitely handcrafted by veteran regional weavers, our ${product || "boutique apparel"} features premium fabrics and intricate details that celebrate true cultural roots.`;
   }
-  
+
   res.json({ success: true, text: fallbackText });
 });
 
@@ -5886,7 +5894,7 @@ setInterval(() => {
           const runTime = new Date(schDate);
           if (runTime <= now && !camp.publishedAt) {
             console.log(`[SAAS AUTOPUBLISHER] Processing Scheduled campaign broadcast: "${camp.name}" (ID: ${camp.id}) belonging to: ${email}`);
-            
+
             // Execute the automated publishing integration
             executePublishCampaign(email, camp).then(result => {
               // Add publish history records
@@ -6008,7 +6016,7 @@ async function startServer() {
     path.join(process.cwd(), "dist")
   ];
   const distPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, "index.html")));
-  
+
   if (distPath) {
     console.log(`[SERVE FRONTEND] Serving static UI app from: ${distPath}`);
     app.use(express.static(distPath));

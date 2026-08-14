@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { getApiUrl } from '../../services/api';
+import { apiService } from '../../services/api';
 import { 
   Instagram, 
   Facebook, 
@@ -89,13 +89,8 @@ export const SocialPublishing: React.FC = () => {
   const fetchConnectionsAndPosts = async () => {
     setLoadingConnections(true);
     try {
-      const headers = {
-        'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
-      };
-      
-      const connRes = await fetch(getApiUrl('/api/social/connections'), { headers });
-      if (connRes.ok) {
-        const connData = await connRes.json();
+      const connData = await apiService.getSocialConnections();
+      if (connData && connData.connections) {
         const connArr = connData.connections || [];
         const fbConn = connArr.find((c: any) => c.platform === 'facebook')?.connected || false;
         const igConn = connArr.find((c: any) => c.platform === 'instagram')?.connected || false;
@@ -119,15 +114,14 @@ export const SocialPublishing: React.FC = () => {
       }
 
       setLoadingScheduled(true);
-      const postsRes = await fetch(getApiUrl('/api/campaigns'), { headers });
-      if (postsRes.ok) {
-        const campaigns = await postsRes.json();
+      const campaigns = await apiService.getCampaigns();
+      if (Array.isArray(campaigns)) {
         const scheduledOnes = campaigns
           .filter((c: any) => c.status === 'Scheduled')
           .map((c: any) => ({
             id: c.id,
             channels: c.platforms || [],
-            caption: c.generatedCaption || '',
+            caption: c.generatedCaption || c.caption || '',
             mediaUrl: c.bannerUrl || '',
             scheduledTime: c.scheduledDate || c.startDate || '',
             status: 'PENDING' as const
@@ -159,40 +153,23 @@ export const SocialPublishing: React.FC = () => {
     setPublishedResults(null);
 
     try {
-      const response = await fetch(getApiUrl('/api/social/publish'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
-        },
-        body: JSON.stringify({
-          campaignId: `camp-pub-${Date.now()}`,
-          caption,
-          headline: posterHeadline,
-          platforms: activeChannels,
-          bannerUrl: currentProductImage
-        })
+      const data = await apiService.publishSocial({
+        campaignId: `camp-pub-${Date.now()}`,
+        caption,
+        headline: posterHeadline,
+        platforms: activeChannels,
+        bannerUrl: currentProductImage
       });
 
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (data && data.success) {
         setPublishedSuccess(true);
-        
-        // Mock the platform status response format the UI expects for display
-        const resultObject: Record<string, any> = {};
-        activeChannels.forEach(channel => {
-          resultObject[channel] = {
-            status: 'simulated',
-            postId: 'mock-post-' + Math.floor(Math.random() * 1000000)
-          };
-        });
-        setPublishedResults(resultObject);
+        setPublishedResults(data.results || {});
         setErrorLog(null);
       } else {
-        setErrorLog(data.error || "Failed to publish campaign to selected channels. Please verify credentials.");
+        setErrorLog(data?.error || data?.message || "Failed to publish campaign to selected channels.");
       }
     } catch (err: any) {
-      setErrorLog(err.message || "Network exception trying to publish campaign to Meta APIs.");
+      setErrorLog(err.response?.data?.message || err.message || "Failed to publish campaign to Meta APIs.");
     } finally {
       setIsPublishing(false);
     }
@@ -207,50 +184,36 @@ export const SocialPublishing: React.FC = () => {
 
     setErrorLog(null);
     try {
-      const response = await fetch(getApiUrl('/api/social/schedule'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
-        },
-        body: JSON.stringify({
-          campaignId: `camp-sch-${Date.now()}`,
-          caption,
-          headline: posterHeadline,
-          platforms: activeChannels,
-          scheduledDate,
-          recurring: "none",
-          bannerUrl: currentProductImage
-        })
+      const data = await apiService.scheduleSocial({
+        campaignId: `camp-sch-${Date.now()}`,
+        caption,
+        headline: posterHeadline,
+        platforms: activeChannels,
+        scheduledDate,
+        bannerUrl: currentProductImage
       });
 
-      const data = await response.json();
-      if (response.ok && data.success) {
-        // Refresh scheduled list
-        const postsRes = await fetch(getApiUrl('/api/campaigns'), {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}` }
-        });
-        if (postsRes.ok) {
-          const campaigns = await postsRes.json();
+      if (data && data.success) {
+        const campaigns = await apiService.getCampaigns();
+        if (Array.isArray(campaigns)) {
           const scheduledOnes = campaigns
             .filter((c: any) => c.status === 'Scheduled')
             .map((c: any) => ({
               id: c.id,
               channels: c.platforms || [],
-              caption: c.generatedCaption || '',
+              caption: c.generatedCaption || c.caption || '',
               mediaUrl: c.bannerUrl || '',
               scheduledTime: c.scheduledDate || c.startDate || '',
               status: 'PENDING' as const
             }));
           setScheduledPosts(scheduledOnes);
         }
-        // Switch tab or notify
         alert("Campaign successfully scheduled in our automated background posting registry!");
       } else {
-        setErrorLog(data.error || "Failed to schedule broadcast.");
+        setErrorLog(data?.error || data?.message || "Failed to schedule broadcast.");
       }
     } catch (err: any) {
-      setErrorLog(err.message || "Failed to contact scheduling server.");
+      setErrorLog(err.response?.data?.message || err.message || "Failed to contact scheduling server.");
     }
   };
 
@@ -306,7 +269,7 @@ export const SocialPublishing: React.FC = () => {
         return {
           bg: 'bg-indigo-950',
           borderColor: 'border-amber-500',
-          textColor: 'text-amber-5',
+          textColor: 'text-amber-100',
           headlineColor: 'text-amber-400',
           fontClass: 'font-serif',
           accentBorder: 'border-amber-500/30',
@@ -959,11 +922,8 @@ export const SocialPublishing: React.FC = () => {
                           onClick={async () => {
                             if (confirm("Are you sure you want to cancel this scheduled post?")) {
                               try {
-                                const res = await fetch(getApiUrl(`/api/campaigns/${post.id}`), {
-                                  method: 'DELETE',
-                                  headers: { 'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}` }
-                                });
-                                if (res.ok) {
+                                const res = await apiService.deleteCampaign(post.id);
+                                if (res && res.success) {
                                   setScheduledPosts(p => p.filter(x => x.id !== post.id));
                                   alert("Scheduled campaign cancelled successfully.");
                                 }
