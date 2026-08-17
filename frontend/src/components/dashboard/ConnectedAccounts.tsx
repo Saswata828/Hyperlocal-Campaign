@@ -38,9 +38,36 @@ export interface SocialConnection {
 export const ConnectedAccounts: React.FC = () => {
   const [connections, setConnections] = React.useState<SocialConnection[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
-  const [activeTab, setActiveTab] = React.useState<'links' | 'developer'>('links');
+  const [activeTab, setActiveTab] = React.useState<'links' | 'developer' | 'diagnostics'>('links');
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [alert, setAlert] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Facebook OAuth Diagnostic Telemetry State
+  const [diagData, setDiagData] = React.useState<any>(null);
+  const [diagLoading, setDiagLoading] = React.useState<boolean>(false);
+  const [diagError, setDiagError] = React.useState<string | null>(null);
+
+  const fetchDiagnostics = async () => {
+    setDiagLoading(true);
+    setDiagError(null);
+    try {
+      const res = await fetch(getApiUrl('/api/social/debug-status'), {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
+        }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status} Unauthorized`);
+      }
+      const data = await res.json();
+      setDiagData(data.audit || null);
+    } catch (err: any) {
+      setDiagError(err.message || 'Failed to load diagnostic metrics');
+    } finally {
+      setDiagLoading(false);
+    }
+  };
 
   // Developer custom credential fields (encrypted on backend)
   const [devConfig, setDevConfig] = React.useState({
@@ -341,7 +368,7 @@ export const ConnectedAccounts: React.FC = () => {
       )}
 
       {/* Segment TabsSwitcher */}
-      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit">
+      <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit gap-1">
         <button
           onClick={() => setActiveTab('links')}
           className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${activeTab === 'links'
@@ -359,6 +386,18 @@ export const ConnectedAccounts: React.FC = () => {
             }`}
         >
           <Sliders className="h-3.5 w-3.5 inline mr-1 text-emerald-600" /> Production Developer Keys
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('diagnostics');
+            fetchDiagnostics();
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${activeTab === 'diagnostics'
+            ? 'bg-white text-slate-900 shadow-sm'
+            : 'text-slate-500 hover:text-slate-800'
+            }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 inline mr-1 text-purple-600" /> Facebook OAuth Diagnostics
         </button>
       </div>
 
@@ -501,7 +540,7 @@ export const ConnectedAccounts: React.FC = () => {
               );
             })}
           </motion.div>
-        ) : (
+        ) : activeTab === 'developer' ? (
           <motion.div
             key="developer-view"
             initial={{ opacity: 0, y: 10 }}
@@ -659,7 +698,164 @@ export const ConnectedAccounts: React.FC = () => {
 
             </form>
           </motion.div>
-        )}
+        ) : activeTab === 'diagnostics' ? (
+          <motion.div
+            key="diagnostics-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                    <span>Facebook OAuth Diagnostics</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                    Real-time Graph API audit telemetry for your active Meta Login session.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchDiagnostics}
+                  disabled={diagLoading}
+                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${diagLoading ? 'animate-spin' : ''}`} /> Refresh Telemetry
+                </button>
+              </div>
+
+              {diagLoading ? (
+                <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="h-7 w-7 text-indigo-600 animate-spin" />
+                  <span className="text-xs text-slate-500 font-bold">Querying Meta Graph API telemetry audit...</span>
+                </div>
+              ) : diagError ? (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-4 text-xs font-bold space-y-1">
+                  <strong>⚠️ Diagnostic Query Failed:</strong>
+                  <p className="font-medium text-rose-700">{diagError}</p>
+                </div>
+              ) : !diagData || diagData.status ? (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-5 text-xs font-semibold space-y-2">
+                  <strong className="font-black text-amber-950 text-sm">ℹ️ No OAuth Audit Attempt Logged Yet</strong>
+                  <p>
+                    You haven't initiated a Facebook Login attempt in this user session yet, or your backend server was restarted.
+                  </p>
+                  <p className="text-[11px] text-amber-800">
+                    Click <strong>"Connect with Facebook"</strong> in the Connected Accounts tab above, complete Meta authorization, and then click <strong>"Refresh Telemetry"</strong> here to inspect live Graph API responses.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Metric Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">OAuth Status</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`h-2.5 w-2.5 rounded-full ${diagData.discoveredPagesCount > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                        <strong className="text-sm font-black text-slate-900">
+                          {diagData.discoveredPagesCount > 0 ? 'Connected' : 'Assets Pending'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Facebook User</span>
+                      <strong className="text-xs font-black text-slate-900 block truncate">
+                        {diagData.profileName || 'Facebook User'}
+                      </strong>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Token Validity</span>
+                      <strong className="text-xs font-black text-slate-900 block">
+                        {diagData.tokenValid ? '✅ Valid (Active)' : '❌ Invalid / Expired'}
+                      </strong>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Discovered Pages</span>
+                      <strong className="text-sm font-black text-indigo-600 block">
+                        {diagData.discoveredPagesCount || 0} Facebook Page(s)
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Granted Meta Permissions */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">Granted Meta Permissions</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {diagData.grantedPermissions && diagData.grantedPermissions.length > 0 ? (
+                        diagData.grantedPermissions.map((perm: string) => (
+                          <span key={perm} className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10.5px] font-bold px-2.5 py-1 rounded-lg">
+                            ✓ {perm}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
+                          ⚠️ No granted permissions logged in token audit
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Token Debug & Granular Scopes */}
+                  <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 text-xs font-mono space-y-2 overflow-x-auto">
+                    <div className="flex justify-between items-center text-slate-400 text-[10px] font-sans border-b border-slate-800 pb-2">
+                      <span>META GRAPH API TOKEN TELEMETRY AUDIT</span>
+                      <span>App ID: {diagData.tokenAppId || '1684531366178928'}</span>
+                    </div>
+                    <div><span className="text-indigo-400">User Email:</span> {diagData.email}</div>
+                    <div><span className="text-indigo-400">Token Type:</span> {diagData.tokenType || 'USER'}</div>
+                    <div><span className="text-indigo-400">Token Scopes:</span> [{(diagData.tokenScopes || []).join(', ')}]</div>
+                    {diagData.granularScopes && diagData.granularScopes.length > 0 && (
+                      <div>
+                        <span className="text-indigo-400">Granular Business Selections:</span>
+                        <pre className="text-[10px] text-emerald-300 mt-1 whitespace-pre-wrap">
+                          {JSON.stringify(diagData.granularScopes, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Discovered Pages List */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">Discovered Manageable Assets</h3>
+                    {diagData.discoveredPages && diagData.discoveredPages.length > 0 ? (
+                      <div className="space-y-2">
+                        {diagData.discoveredPages.map((pg: any) => (
+                          <div key={pg.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <strong className="text-xs font-black text-slate-900">{pg.name}</strong>
+                              <div className="text-[10px] font-medium text-slate-500 flex items-center gap-3">
+                                <span>Page ID: <code className="font-mono bg-slate-200 px-1 rounded text-slate-800">{pg.id}</code></span>
+                                <span>Page Token: {pg.hasAccessToken ? '✅ Active' : '❌ Missing'}</span>
+                                {pg.instagramConnected && (
+                                  <span className="text-pink-600 font-bold">📸 Instagram Professional Linked</span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black px-2.5 py-1 rounded-full">
+                              {pg.type || 'Live Page'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs font-semibold text-rose-800 space-y-1">
+                        <strong>⚠️ Zero Facebook Pages Returned by Meta API</strong>
+                        <p className="text-[11px] text-rose-700">
+                          {diagData.lastErrorMessage || 'No Facebook Pages were returned for this authorized session. Please verify that your Facebook account is an Admin/Editor of the Page and that you selected the Page during the Meta consent dialog.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
     </div>
