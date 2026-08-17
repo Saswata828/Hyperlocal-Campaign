@@ -4794,16 +4794,6 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
     });
   }
 
-  let useSandbox = false;
-
-  if (useSandbox) {
-    console.log(`[SOCIAL OAUTH SANDBOX] Bypassing live OAuth. Routing platform "${platform}" to developer sandbox simulator.`);
-    return res.json({
-      url: `/auth/social-sandbox?platform=${platform}`,
-      isSandbox: true
-    });
-  }
-
   let providerUrl = "";
   const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "";
   const requestedFlow = (platform === "facebook" || platform === "instagram" || platform === "whatsapp") && configId ? "Facebook Login for Business" : "Standard OAuth";
@@ -4834,7 +4824,7 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
 
 app.get("/api/social/debug-status", authGuard, (req: any, res) => {
   const userEmail = (req.user?.email || "").toLowerCase().trim();
-  const audit = oauthDebugAuditCache[userEmail] || {
+  const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"] || {
     status: "No OAuth attempts logged yet for this user session."
   };
   res.json({
@@ -4843,7 +4833,6 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
     audit
   });
 });
-
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
   const { code, state } = req.query;
@@ -4865,8 +4854,14 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   let rawTokenInfo: any = {};
   let errorMessage = "";
   let profileName = "Facebook User";
+  let profileId = "";
   let profilePic = "";
   let email = "";
+  let grantedPermissions: string[] = [];
+  let declinedPermissions: string[] = [];
+  let tokenDebugInfo: any = null;
+  let tokenExchangeSuccess = false;
+  let pagesHttpStatus: number | string = "N/A";
 
   let isStateValid = true;
   if (code) {
@@ -4888,24 +4883,40 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     }
   }
 
-  console.log(`[OAUTH CALLBACK] Platform: ${platform} | Redirect URI: ${redirectUri} | State Validation Result: ${isStateValid ? "Success" : "Failed"}`);
+  console.log(`[OAUTH CALLBACK] Code present: ${!!code} | Platform: ${platform} | Redirect URI: ${redirectUri} | State Valid: ${isStateValid}`);
 
   if (code && isStateValid) {
     try {
       if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
         console.log(`[META OAUTH SEQUENCE Step 1/6] OAuth authorization code received from Meta callback.`);
-        console.log(`[OAUTH TOKEN] Initiating token exchange for platform: ${platform}`);
-        const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
-          params: {
-            client_id: fbClientId,
-            client_secret: fbClientSecret,
-            redirect_uri: redirectUri,
-            code
+        console.log(`[OAUTH TOKEN] Initiating token exchange with redirect_uri: ${redirectUri}`);
+
+        let userAccessToken = "";
+        try {
+          const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
+            params: {
+              client_id: fbClientId,
+              client_secret: fbClientSecret,
+              redirect_uri: redirectUri,
+              code
+            }
+          });
+          userAccessToken = tokenRes.data.access_token;
+          rawTokenInfo.userAccessToken = userAccessToken;
+          tokenExchangeSuccess = true;
+          console.log(`[META OAUTH SEQUENCE Step 2/6] Authorization code exchanged for User Access Token successfully (HTTP ${tokenRes.status}).`);
+        } catch (tokenErr: any) {
+          const status = tokenErr.response?.status || "N/A";
+          const metaError = tokenErr.response?.data?.error;
+          console.error(`[META OAUTH TOKEN EXCHANGE ERROR] HTTP Status: ${status} | Error:`, sanitizeForLogging(metaError || tokenErr.message));
+          if (metaError) {
+            errorMessage = `Meta OAuth Token Exchange Failed (${metaError.code}): ${metaError.message}`;
+          } else {
+            errorMessage = `Meta OAuth Token Exchange Failed (${status}): ${tokenErr.message}`;
           }
-        });
-        const userAccessToken = tokenRes.data.access_token;
-        rawTokenInfo.userAccessToken = userAccessToken;
-        console.log(`[META OAUTH SEQUENCE Step 2/6] Authorization code exchanged for User Access Token successfully.`);
+          isFallback = true;
+          throw new Error(errorMessage);
+        }
 
         // Exchange for long-lived access token
         try {
@@ -4918,7 +4929,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             }
           });
           rawTokenInfo.longLivedAccessToken = longLivedRes.data.access_token;
-          console.log(`[OAUTH TOKEN] Long-lived User Access Token exchange successful for platform: ${platform}`);
+          console.log(`[META OAUTH SEQUENCE Step 2b/6] Long-lived User Access Token exchange succeeded.`);
         } catch (e) {
           rawTokenInfo.longLivedAccessToken = userAccessToken;
         }
@@ -4928,28 +4939,26 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         // Step 3: Fetch basic profile info (/me)
         try {
           const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=id,name,picture&access_token=${activeToken}`);
+          profileId = profileRes.data.id || "";
           profileName = profileRes.data.name || profileName;
           profilePic = profileRes.data.picture?.data?.url || profilePic;
-          console.log(`[META OAUTH SEQUENCE Step 3/6] GET /me completed. User ID: ${profileRes.data?.id} | Name: ${profileRes.data?.name}`);
+          console.log(`[META OAUTH SEQUENCE Step 3/6] GET /me completed (HTTP ${profileRes.status}). User ID: ${profileId} | Name: ${profileName}`);
         } catch (e: any) {
           console.error(`[META /me ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
 
-        // Check currently granted permissions safely without logging raw tokens
-        let grantedPermissions: string[] = [];
-        let declinedPermissions: string[] = [];
+        // Step 3b: Check currently granted permissions (/me/permissions)
         try {
           const permRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/permissions?access_token=${activeToken}`);
           const permData = permRes.data?.data || [];
           grantedPermissions = permData.filter((p: any) => p.status === "granted").map((p: any) => p.permission);
           declinedPermissions = permData.filter((p: any) => p.status === "declined").map((p: any) => p.permission);
-          console.log(`[META PERMISSIONS AUDIT] HTTP Status: ${permRes.status} | Granted (${grantedPermissions.length}): [${grantedPermissions.join(", ")}] | Declined (${declinedPermissions.length}): [${declinedPermissions.join(", ")}]`);
+          console.log(`[META OAUTH SEQUENCE Step 3b/6] GET /me/permissions HTTP Status: ${permRes.status} | Granted (${grantedPermissions.length}): [${grantedPermissions.join(", ")}] | Declined (${declinedPermissions.length}): [${declinedPermissions.join(", ")}]`);
         } catch (e: any) {
           console.error(`[META PERMISSIONS ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
 
-        // Debug active token metadata safely without logging raw tokens
-        let tokenDebugInfo: any = null;
+        // Step 3c: Debug active token metadata (/debug_token)
         try {
           const debugRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/debug_token`, {
             params: {
@@ -4958,9 +4967,13 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             }
           });
           tokenDebugInfo = debugRes.data?.data;
-          console.log(`[META TOKEN DEBUG] Valid: ${tokenDebugInfo?.is_valid} | App ID: ${tokenDebugInfo?.app_id} | Type: ${tokenDebugInfo?.type} | Scopes: [${(tokenDebugInfo?.scopes || []).join(", ")}]`);
+          console.log(`[META OAUTH SEQUENCE Step 3c/6] Debug Token HTTP Status: ${debugRes.status} | Token Valid: ${tokenDebugInfo?.is_valid} | App ID: ${tokenDebugInfo?.app_id} | Type: ${tokenDebugInfo?.type} | Scopes: [${(tokenDebugInfo?.scopes || []).join(", ")}]`);
         } catch (e: any) {
           console.error(`[META TOKEN DEBUG ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
+        }
+
+        if (grantedPermissions.length === 0) {
+          console.warn(`[META PERMISSIONS WARNING] Granted permissions list is empty. Token may be scope-restricted.`);
         }
 
         // Step 4 & 5: Fetch assets from actual returned Meta token response
@@ -4973,11 +4986,11 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 access_token: activeToken
               }
             });
-            const status = pagesRes.status;
+            pagesHttpStatus = pagesRes.status;
             let pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
             const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
 
-            console.log(`[META /me/accounts RESPONSE] HTTP Status: ${status} | Returned Pages Count: ${pagesData.length}`);
+            console.log(`[META /me/accounts RESPONSE] HTTP Status: ${pagesHttpStatus} | Returned Pages Count: ${pagesData.length}`);
             console.log(`[META /me/accounts RAW DATA] (Sanitized for logging):`, JSON.stringify(sanitizedResponseData, null, 2));
 
             // Fallback 1: Check granular_scopes target_ids if /me/accounts returned empty array
@@ -5086,7 +5099,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               }
               console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
             } else {
-              // CASE A: Meta OAuth succeeds but /me/accounts returns an empty data array
               console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages after all discovery attempts.`);
               const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
               const missingPerms = requiredPagePerms.filter(perm => !grantedPermissions.includes(perm));
@@ -5094,16 +5106,16 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               if (missingPerms.length > 0) {
                 console.warn(`[DIAGNOSTIC CAUSE]: Required Page permissions missing from token: [${missingPerms.join(", ")}]. Granted permissions were: [${grantedPermissions.join(", ")}].`);
               } else {
-                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages returned. Potential causes: 1) User owns/manages no Facebook Pages, 2) During Meta Business Login dialog, user did not select/grant any specific Facebook Page to the app, 3) Token type '${tokenDebugInfo?.type || 'UNKNOWN'}' or Business Login configuration settings restrict page access.`);
+                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages returned.`);
               }
 
               errorMessage = "No Facebook Pages are available for this Facebook account. Make sure you are an administrator/task-enabled user of at least one Facebook Page and selected the Page during Meta authorization.";
               isFallback = true;
             }
           } catch (err: any) {
-            // CASE B: Meta returns an OAuth/API error
             const httpStatus = err.response?.status;
             const metaError = err.response?.data?.error;
+            pagesHttpStatus = httpStatus || "ERROR";
             console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
             if (metaError) {
               console.error(`[META ERROR DETAILS] Code: ${metaError.code} | Subcode: ${metaError.error_subcode || 'N/A'} | Type: ${metaError.type} | Message: ${metaError.message}`);
