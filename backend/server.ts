@@ -4838,6 +4838,7 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
     audit: {
       appId: audit.tokenAppId || META_APP_ID || "1684531366178928",
       facebookUserId: audit.facebookUserId || "N/A",
+      facebookUserName: audit.profileName || "Facebook User",
       tokenValid: typeof audit.tokenValid !== 'undefined' ? !!audit.tokenValid : false,
       tokenExpiration: audit.tokenExpiration || "60 days (long-lived User Access Token)",
       grantedPermissions: audit.grantedPermissions || [],
@@ -4845,6 +4846,8 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
       pageCount: audit.discoveredPagesCount || 0,
       pageNames: (audit.discoveredPages || []).map((p: any) => p.name),
       pageIds: (audit.discoveredPages || []).map((p: any) => p.id),
+      pagesHttpStatus: audit.pagesHttpStatus || "N/A",
+      diagnosticClassification: audit.diagnosticClassification || "N/A",
       databaseConnectionStatus: isConnectedInDb 
         ? `Connected in DB (Page: ${fbConnInDb?.name || "Linked Page"}, ID: ${fbConnInDb?.accountId || "N/A"})` 
         : "Not Connected in Database",
@@ -4852,6 +4855,89 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
       timestamp: audit.timestamp || new Date().toISOString()
     }
   });
+});
+
+app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
+  const pageId = (req.query.pageId || req.body?.pageId || "").toString().trim();
+  const userEmail = (req.user?.email || "").toLowerCase().trim();
+  const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"];
+  const activeToken = audit?.activeToken || tempOAuthCache[`${userEmail}-facebook`]?.[0]?.accessToken;
+
+  if (!pageId) {
+    return res.status(400).json({
+      success: false,
+      error: "Page ID parameter is required. Usage: GET/POST /api/social/test-page-direct?pageId=YOUR_PAGE_ID"
+    });
+  }
+
+  if (!activeToken) {
+    return res.status(400).json({
+      success: false,
+      error: "No active Facebook User Access Token found in your active session. Please authenticate via Facebook OAuth first."
+    });
+  }
+
+  try {
+    console.log(`[PAGE DIRECT TEST] Testing Page ID: ${pageId} with User Access Token...`);
+    const pageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${pageId}`, {
+      params: {
+        fields: "id,name,access_token,tasks,instagram_business_account,category",
+        access_token: activeToken
+      }
+    });
+
+    const sanitizedData = sanitizeForLogging(pageRes.data);
+    console.log(`[PAGE DIRECT TEST SUCCESS] HTTP Status: ${pageRes.status} | Data:`, JSON.stringify(sanitizedData, null, 2));
+
+    let igDetails: any = null;
+    if (pageRes.data?.instagram_business_account?.id && pageRes.data?.access_token) {
+      try {
+        const igId = pageRes.data.instagram_business_account.id;
+        const igRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=id,username,name,profile_picture_url&access_token=${pageRes.data.access_token}`);
+        igDetails = igRes.data;
+      } catch (igErr: any) {
+        console.warn("[PAGE DIRECT TEST IG WARN]", igErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      httpStatus: pageRes.status,
+      page: {
+        id: pageRes.data.id,
+        name: pageRes.data.name,
+        category: pageRes.data.category || "N/A",
+        hasPageAccessToken: !!pageRes.data.access_token,
+        tasks: pageRes.data.tasks || [],
+        instagramBusinessAccount: igDetails ? {
+          id: igDetails.id,
+          username: igDetails.username,
+          name: igDetails.name || igDetails.username
+        } : null
+      }
+    });
+  } catch (err: any) {
+    const status = err.response?.status || 500;
+    const metaError = err.response?.data?.error;
+    console.error(`[PAGE DIRECT TEST ERROR] HTTP Status: ${status} | Error:`, sanitizeForLogging(metaError || err.message));
+
+    let classification = "D. Page exists but Graph API cannot access it";
+    if (status === 404 || metaError?.code === 100 || metaError?.code === 803) {
+      classification = "D. Page ID not found or unsupported by current Meta App credentials";
+    } else if (metaError?.code === 190) {
+      classification = "A. OAuth User Access Token is invalid or expired";
+    } else if (metaError?.code === 200 || metaError?.code === 10) {
+      classification = "C. Permission error: User or App has not been granted required Page permissions";
+    }
+
+    return res.status(status).json({
+      success: false,
+      httpStatus: status,
+      classification,
+      error: metaError ? `Meta Error (${metaError.code}): ${metaError.message}` : err.message,
+      metaErrorDetails: metaError || null
+    });
+  }
 });
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
@@ -5268,30 +5354,58 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     isFallback = true;
   }
 
-  const userEmail = email.toLowerCase().trim() || (req.user?.email || "").toLowerCase().trim() || "anonymous";
-  if (userEmail && userEmail !== "anonymous") {
-    oauthDebugAuditCache[userEmail] = {
-      platform,
-      timestamp: new Date().toISOString(),
-      email: userEmail,
-      profileName,
-      grantedPermissions: typeof grantedPermissions !== 'undefined' ? grantedPermissions : [],
-      tokenValid: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.is_valid : false,
-      tokenAppId: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.app_id : "N/A",
-      tokenType: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.type : "N/A",
-      tokenScopes: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.scopes : [],
-      granularScopes: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.granular_scopes : [],
-      discoveredPagesCount: options.length,
-      discoveredPages: options.map(opt => ({
-        id: opt.id,
-        name: opt.name,
-        type: opt.type,
-        hasAccessToken: !!opt.accessToken,
-        instagramConnected: !!opt.instagramBusinessAccount
-      })),
-      lastErrorMessage: errorMessage || null
-    };
+  let diagnosticClassification = "None";
+  if (tokenExchangeSuccess && options.length === 0) {
+    if (tokenDebugInfo && !tokenDebugInfo.is_valid) {
+      diagnosticClassification = "A. OAuth User Access Token is invalid or expired";
+    } else if (grantedPermissions.length === 0 || !grantedPermissions.includes("pages_show_list")) {
+      diagnosticClassification = "C. Required Page permissions (pages_show_list, pages_read_engagement, pages_manage_posts) missing from token scope";
+    } else if (tokenDebugInfo?.granular_scopes && tokenDebugInfo.granular_scopes.some((gs: any) => gs.target_ids && gs.target_ids.length > 0)) {
+      diagnosticClassification = "D. Page ID selected in Business Login dialog but direct Graph API lookup failed";
+    } else if (pagesHttpStatus === 200) {
+      diagnosticClassification = "B. OAuth token is valid but Meta returned 0 manageable Pages for this user account";
+    } else {
+      diagnosticClassification = "E. Meta Graph API returned an unexpected response structure or error";
+    }
   }
+
+  const auditEmail = email.toLowerCase().trim() || (req.user?.email || "").toLowerCase().trim() || "latest";
+  const auditReport = {
+    platform,
+    timestamp: new Date().toISOString(),
+    email: auditEmail,
+    facebookUserId: profileId || tokenDebugInfo?.user_id || "N/A",
+    profileName,
+    activeToken: rawTokenInfo.longLivedAccessToken || rawTokenInfo.userAccessToken || "",
+    tokenReceived: tokenExchangeSuccess,
+    tokenValid: tokenDebugInfo ? !!tokenDebugInfo.is_valid : tokenExchangeSuccess,
+    tokenAppId: tokenDebugInfo?.app_id || META_APP_ID || "1684531366178928",
+    tokenType: tokenDebugInfo?.type || "USER",
+    tokenScopes: tokenDebugInfo?.scopes || grantedPermissions || [],
+    granularScopes: tokenDebugInfo?.granular_scopes || [],
+    grantedPermissions: grantedPermissions || [],
+    declinedPermissions: declinedPermissions || [],
+    pagesHttpStatus,
+    discoveredPagesCount: options.length,
+    diagnosticClassification,
+    discoveredPages: options.map(opt => ({
+      id: opt.id,
+      name: opt.name,
+      type: opt.type,
+      tasks: opt.tasks || [],
+      hasAccessToken: !!opt.accessToken,
+      instagramConnected: !!opt.instagramBusinessAccount,
+      instagramAccount: opt.instagramBusinessAccount ? {
+        id: opt.instagramBusinessAccount.id,
+        username: opt.instagramBusinessAccount.username,
+        name: opt.instagramBusinessAccount.name
+      } : null
+    })),
+    lastErrorMessage: errorMessage || null
+  };
+
+  oauthDebugAuditCache[auditEmail] = auditReport;
+  oauthDebugAuditCache["latest"] = auditReport;
 
   // Handle errors for real OAuth flows cleanly
   if (errorMessage || options.length === 0 || !code) {
