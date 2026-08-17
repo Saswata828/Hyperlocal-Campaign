@@ -135,6 +135,28 @@ const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
 const tempOAuthCache: { [key: string]: any[] } = {};
 
+function sanitizeForLogging(obj: any): any {
+  if (!obj) return obj;
+  if (typeof obj !== 'object') return obj;
+  try {
+    const clone = JSON.parse(JSON.stringify(obj));
+    const redactKeys = (item: any) => {
+      if (!item || typeof item !== 'object') return;
+      for (const key of Object.keys(item)) {
+        if (key.toLowerCase().includes('access_token') || key.toLowerCase().includes('secret') || key.toLowerCase() === 'token') {
+          item[key] = '[REDACTED]';
+        } else if (typeof item[key] === 'object') {
+          redactKeys(item[key]);
+        }
+      }
+    };
+    redactKeys(clone);
+    return clone;
+  } catch (e) {
+    return '[UNABLE_TO_SANITIZE]';
+  }
+}
+
 
 
 async function hashPassword(plainText: string): Promise<string> {
@@ -4889,36 +4911,86 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
 
         // Fetch basic profile info
         try {
-          const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=name,picture&access_token=${activeToken}`);
+          const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=id,name,picture&access_token=${activeToken}`);
           profileName = profileRes.data.name || profileName;
           profilePic = profileRes.data.picture?.data?.url || profilePic;
+          console.log(`[META /me RESPONSE] HTTP Status: ${profileRes.status} | User ID: ${profileRes.data?.id} | Name: ${profileRes.data?.name}`);
         } catch (e: any) {
-          console.error("Meta profile fetch error:", e.message);
+          console.error(`[META /me ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
 
         // Check currently granted permissions safely without logging raw tokens
         let grantedPermissions: string[] = [];
+        let declinedPermissions: string[] = [];
         try {
           const permRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/permissions?access_token=${activeToken}`);
-          grantedPermissions = (permRes.data.data || [])
-            .filter((p: any) => p.status === "granted")
-            .map((p: any) => p.permission);
-          console.log(`[META PERMISSIONS AUDIT] Granted permissions for ${platform}: ${grantedPermissions.join(", ") || "none"}`);
+          const permData = permRes.data?.data || [];
+          grantedPermissions = permData.filter((p: any) => p.status === "granted").map((p: any) => p.permission);
+          declinedPermissions = permData.filter((p: any) => p.status === "declined").map((p: any) => p.permission);
+          console.log(`[META PERMISSIONS AUDIT] HTTP Status: ${permRes.status} | Granted (${grantedPermissions.length}): [${grantedPermissions.join(", ")}] | Declined (${declinedPermissions.length}): [${declinedPermissions.join(", ")}]`);
         } catch (e: any) {
-          console.error("Meta permissions check error:", e.message);
+          console.error(`[META PERMISSIONS ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
+        }
+
+        // Debug active token metadata safely without logging raw tokens
+        let tokenDebugInfo: any = null;
+        try {
+          const debugRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/debug_token`, {
+            params: {
+              input_token: activeToken,
+              access_token: `${fbClientId}|${fbClientSecret}`
+            }
+          });
+          tokenDebugInfo = debugRes.data?.data;
+          console.log(`[META TOKEN DEBUG] Valid: ${tokenDebugInfo?.is_valid} | App ID: ${tokenDebugInfo?.app_id} | Type: ${tokenDebugInfo?.type} | Scopes: [${(tokenDebugInfo?.scopes || []).join(", ")}]`);
+        } catch (e: any) {
+          console.error(`[META TOKEN DEBUG ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
 
         // Fetch assets from actual returned Meta token response
         if (platform === "facebook") {
-          const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts?access_token=${activeToken}`);
-          if (pagesRes.data && pagesRes.data.data) {
-            options = pagesRes.data.data.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              accessToken: p.access_token,
-              type: "Live Page"
-            }));
-            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Facebook Page(s) for user.`);
+          try {
+            console.log(`[META /me/accounts CALL] Requesting Facebook Pages for active token...`);
+            const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+              params: { access_token: activeToken }
+            });
+            const status = pagesRes.status;
+            const pagesData = pagesRes.data?.data || [];
+            const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
+
+            console.log(`[META /me/accounts RESPONSE] HTTP Status: ${status} | Returned Pages Count: ${pagesData.length}`);
+            console.log(`[META /me/accounts RESPONSE DATA]:`, JSON.stringify(sanitizedResponseData, null, 2));
+
+            if (pagesData.length > 0) {
+              options = pagesData.map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                accessToken: p.access_token,
+                type: "Live Page"
+              }));
+              console.log(`[META ASSET DISCOVERY SUCCESS] Discovered ${options.length} Facebook Page(s) for user.`);
+            } else {
+              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC]: /me/accounts returned 0 pages.`);
+              const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
+              const missingPerms = requiredPagePerms.filter(p => !grantedPermissions.includes(p));
+
+              if (missingPerms.length > 0) {
+                console.warn(`[DIAGNOSTIC CAUSE]: Required Page permissions missing from token: [${missingPerms.join(", ")}]. Granted permissions were: [${grantedPermissions.join(", ")}].`);
+              } else {
+                console.warn(`[DIAGNOSTIC CAUSE]: Permissions present [${grantedPermissions.join(", ")}], but 0 pages returned. Potential root causes: 1) User owns/manages no Facebook Pages, 2) During Facebook Login for Business dialog, user did not select/grant any specific Facebook Page to the app, 3) Token type '${tokenDebugInfo?.type || 'UNKNOWN'}' or Business Login configuration settings restrict page access.`);
+              }
+            }
+          } catch (err: any) {
+            const httpStatus = err.response?.status;
+            const metaError = err.response?.data?.error;
+            console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
+            if (metaError) {
+              console.error(`[META ERROR DETAILS] Code: ${metaError.code} | Subcode: ${metaError.error_subcode || 'N/A'} | Type: ${metaError.type} | Message: ${metaError.message}`);
+            } else {
+              console.error(`[META ERROR RAW]:`, err.message);
+            }
+            errorMessage = metaError?.message || `Meta API Error (${httpStatus}): ${err.message}`;
+            isFallback = true;
           }
         } else if (platform === "instagram") {
           const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts?access_token=${activeToken}`);
@@ -5027,7 +5099,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
 
   // Handle errors for real OAuth flows cleanly
   if (errorMessage || options.length === 0 || !code) {
-    const displayError = errorMessage || (options.length === 0 ? `No manageable assets or pages were returned by the ${platform} API. Please verify your account configuration.` : "Authorization code is missing. Direct access to callback without authorization code is not allowed.");
+    const displayError = errorMessage || (options.length === 0 ? `No Facebook Pages or manageable assets were returned by Meta for this account. Please verify that: 1) You manage at least one active Facebook Page, 2) You selected your Page during the Facebook Login dialog, and 3) Your Meta Business Login configuration has the required permissions (pages_show_list, pages_read_engagement, pages_manage_posts).` : "Authorization code is missing. Direct access to callback without authorization code is not allowed.");
     return res.send(`
       <html>
         <head>
