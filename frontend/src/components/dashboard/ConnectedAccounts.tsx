@@ -472,11 +472,11 @@ export const ConnectedAccounts: React.FC = () => {
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 text-[10.5px] font-bold text-slate-700 space-y-1 shadow-inner">
                         <div className="flex justify-between">
                           <span className="text-slate-400 font-semibold">Linked Name:</span>
-                          <span className="text-slate-900 truncate max-w-[150px]">{conn.name || 'AdPulse Sandbox Profile'}</span>
+                          <span className="text-slate-900 truncate max-w-[150px]">{conn.name || 'Connected Page'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400 font-semibold">Account ID:</span>
-                          <span className="text-slate-900 font-mono text-[9px]">{conn.accountId || 'sb-103948572'}</span>
+                          <span className="text-slate-900 font-mono text-[9px]">{conn.accountId || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-400 font-semibold">Sync Date:</span>
@@ -753,17 +753,17 @@ export const ConnectedAccounts: React.FC = () => {
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
                       <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">OAuth Status</span>
                       <div className="flex items-center gap-1.5">
-                        <span className={`h-2.5 w-2.5 rounded-full ${diagData.discoveredPagesCount > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                        <span className={`h-2.5 w-2.5 rounded-full ${(diagData.pageCount || diagData.discoveredPagesCount) > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                         <strong className="text-sm font-black text-slate-900">
-                          {diagData.discoveredPagesCount > 0 ? 'Connected' : 'Assets Pending'}
+                          {(diagData.pageCount || diagData.discoveredPagesCount) > 0 ? 'Connected' : 'Assets Pending'}
                         </strong>
                       </div>
                     </div>
 
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
-                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Facebook User</span>
+                      <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Facebook User ID</span>
                       <strong className="text-xs font-black text-slate-900 block truncate">
-                        {diagData.profileName || 'Facebook User'}
+                        {diagData.facebookUserId || 'N/A'}
                       </strong>
                     </div>
 
@@ -777,7 +777,7 @@ export const ConnectedAccounts: React.FC = () => {
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
                       <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Discovered Pages</span>
                       <strong className="text-sm font-black text-indigo-600 block">
-                        {diagData.discoveredPagesCount || 0} Facebook Page(s)
+                        {diagData.pageCount ?? diagData.discoveredPagesCount ?? 0} Facebook Page(s)
                       </strong>
                     </div>
                   </div>

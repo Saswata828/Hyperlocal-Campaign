@@ -4805,7 +4805,7 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
       if (platform === "whatsapp") {
         providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
       } else {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,pages_read_user_content,pages_manage_metadata,business_management,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
       }
     }
   } else if (platform === "google") {
@@ -4824,13 +4824,33 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
 
 app.get("/api/social/debug-status", authGuard, (req: any, res) => {
   const userEmail = (req.user?.email || "").toLowerCase().trim();
+  const dbUser = userSocialConnections[userEmail];
   const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"] || {
     status: "No OAuth attempts logged yet for this user session."
   };
+
+  const isConnectedInDb = dbUser?.connections?.some((c: any) => c.platform === "facebook" && c.connected);
+  const fbConnInDb = dbUser?.connections?.find((c: any) => c.platform === "facebook" && c.connected);
+
   res.json({
     success: true,
     userEmail,
-    audit
+    audit: {
+      appId: audit.tokenAppId || META_APP_ID || "1684531366178928",
+      facebookUserId: audit.facebookUserId || "N/A",
+      tokenValid: typeof audit.tokenValid !== 'undefined' ? !!audit.tokenValid : false,
+      tokenExpiration: audit.tokenExpiration || "60 days (long-lived User Access Token)",
+      grantedPermissions: audit.grantedPermissions || [],
+      declinedPermissions: audit.declinedPermissions || [],
+      pageCount: audit.discoveredPagesCount || 0,
+      pageNames: (audit.discoveredPages || []).map((p: any) => p.name),
+      pageIds: (audit.discoveredPages || []).map((p: any) => p.id),
+      databaseConnectionStatus: isConnectedInDb 
+        ? `Connected in DB (Page: ${fbConnInDb?.name || "Linked Page"}, ID: ${fbConnInDb?.accountId || "N/A"})` 
+        : "Not Connected in Database",
+      lastErrorMessage: audit.lastErrorMessage || null,
+      timestamp: audit.timestamp || new Date().toISOString()
+    }
   });
 });
 
