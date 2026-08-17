@@ -130,6 +130,7 @@ const META_VERSION = process.env.META_API_VERSION || process.env.META_GRAPH_API_
 const META_APP_ID = process.env.META_APP_ID || process.env.FACEBOOK_APP_ID || "";
 const META_APP_SECRET = process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "";
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI || "";
+const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || "";
 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
 const tempOAuthCache: { [key: string]: any[] } = {};
@@ -4195,7 +4196,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
       if (fbPageId && fbToken && !fbToken.startsWith("mock-")) {
         try {
           auditLogs.push(`[FACEBOOK API] Dispatching Page Post to ID ${fbPageId}...`);
-          const response = await axios.post(`https://graph.facebook.com/v18.0/${fbPageId}/feed`, {
+          const response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, {
             message: `${campaign.generatedHeadline || ""}\n\n${campaign.generatedCaption || ""}\n\n${(campaign.generatedHashtags || []).join(" ")}`,
             link: campaign.bannerUrl || ""
           }, {
@@ -4222,7 +4223,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
       if (igBusinessId && fbToken && !fbToken.startsWith("mock-")) {
         try {
           auditLogs.push(`[INSTAGRAM API] Initiating IG Media Container Creation...`);
-          const containerRes = await axios.post(`https://graph.facebook.com/v18.0/${igBusinessId}/media`, {
+          const containerRes = await axios.post(`https://graph.facebook.com/${META_VERSION}/${igBusinessId}/media`, {
             image_url: campaign.bannerUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
             caption: `${campaign.generatedHeadline || ""}\n\n${campaign.generatedCaption || ""}\n\n${(campaign.generatedHashtags || []).join(" ")}`
           }, {
@@ -4236,11 +4237,11 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
           for (let attempt = 1; attempt <= 3; attempt++) {
             await new Promise(r => setTimeout(r, 4000));
             try {
-              const statusRes = await axios.get(`https://graph.facebook.com/v18.0/${containerId}?fields=status_code,status&access_token=${fbToken}`);
+              const statusRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${containerId}?fields=status_code,status&access_token=${fbToken}`);
               const status = statusRes.data.status_code || statusRes.data.status;
               auditLogs.push(`[INSTAGRAM API] Container ${containerId} status check (attempt ${attempt}): ${status}`);
               if (status === "FINISHED" || status === "READY") {
-                const publishRes = await axios.post(`https://graph.facebook.com/v18.0/${igBusinessId}/media_publish`, {
+                const publishRes = await axios.post(`https://graph.facebook.com/${META_VERSION}/${igBusinessId}/media_publish`, {
                   creation_id: containerId
                 }, {
                   headers: { Authorization: `Bearer ${fbToken}` }
@@ -4256,7 +4257,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
 
           if (!published) {
             auditLogs.push(`[INSTAGRAM API] Polling inconclusive. Attempting direct media_publish transaction...`);
-            const publishRes = await axios.post(`https://graph.facebook.com/v18.0/${igBusinessId}/media_publish`, {
+            const publishRes = await axios.post(`https://graph.facebook.com/${META_VERSION}/${igBusinessId}/media_publish`, {
               creation_id: containerId
             }, {
               headers: { Authorization: `Bearer ${fbToken}` }
@@ -4741,7 +4742,7 @@ app.get("/auth/social-sandbox", (req, res) => {
 
 app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   const { platform } = req.query;
-  const redirectUri = META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback?platform=${platform}`;
+  const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
 
   // Generate a cryptographically signed state token containing user session details
   const statePayload = {
@@ -4779,19 +4780,25 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   }
 
   let providerUrl = "";
+  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "";
+  const requestedFlow = (platform === "facebook" || platform === "instagram" || platform === "whatsapp") && configId ? "Facebook Login for Business" : "Standard OAuth";
+
   if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
-    if (platform === "facebook") {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email&state=${state}`;
-    } else if (platform === "instagram") {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,instagram_basic,instagram_content_publish&state=${state}`;
-    } else if (platform === "whatsapp") {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${state}`;
+    if (configId) {
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&config_id=${configId}&response_type=code&state=${encodeURIComponent(state)}`;
+    } else {
+      if (platform === "whatsapp") {
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
+      } else {
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
+      }
     }
   } else if (platform === "google") {
-    providerUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID || "1234567"}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/business.manage&state=${state}`;
+    providerUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID || "1234567"}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/business.manage&state=${encodeURIComponent(state)}`;
   }
 
-  // Log complete generated URL on the backend, omitting client secrets or access tokens (none of which are present in this URL)
+  // Safe backend logs without printing access tokens or secrets
+  console.log(`[OAUTH START] Platform: ${platform} | Redirect URI: ${redirectUri} | Configuration ID: ${configId || "N/A"} | Requested Flow: ${requestedFlow}`);
   console.log(`[META OAUTH URL] Generated OAuth URL: ${providerUrl}`);
 
   res.json({
@@ -4802,8 +4809,16 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
 
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
-  const { code, platform, state } = req.query;
-  const redirectUri = META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback?platform=${platform}`;
+  const { code, state } = req.query;
+  const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
+
+  let verifiedState: any = null;
+  if (state) {
+    verifiedState = verifyOAuthState(state as string);
+  }
+
+  const reqPlatform = (req.query.platform as string) || (verifiedState ? verifiedState.platform : "facebook");
+  const platform = verifiedState?.platform || reqPlatform;
 
   const fbClientId = META_APP_ID;
   const fbClientSecret = META_APP_SECRET;
@@ -4819,8 +4834,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   let isStateValid = true;
   if (code) {
     if (state) {
-      const verifiedState = verifyOAuthState(state as string);
-      if (!verifiedState || verifiedState.platform !== platform) {
+      if (!verifiedState || (req.query.platform && verifiedState.platform !== req.query.platform)) {
         console.error(`[OAUTH STATE ERROR] Invalid state parameter for platform ${platform}`);
         isStateValid = false;
         errorMessage = "Security validation failed: The OAuth state parameter was invalid or expired.";
@@ -4837,9 +4851,12 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     }
   }
 
+  console.log(`[OAUTH CALLBACK] Platform: ${platform} | Redirect URI: ${redirectUri} | State Validation Result: ${isStateValid ? "Success" : "Failed"}`);
+
   if (code && isStateValid) {
     try {
       if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
+        console.log(`[OAUTH TOKEN] Initiating token exchange for platform: ${platform}`);
         const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
           params: {
             client_id: fbClientId,
@@ -4850,6 +4867,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         });
         const userAccessToken = tokenRes.data.access_token;
         rawTokenInfo.userAccessToken = userAccessToken;
+        console.log(`[OAUTH TOKEN] Token exchange successful for platform: ${platform}`);
 
         // Exchange for long-lived access token
         try {
@@ -4862,6 +4880,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             }
           });
           rawTokenInfo.longLivedAccessToken = longLivedRes.data.access_token;
+          console.log(`[OAUTH TOKEN] Long-lived token exchange successful for platform: ${platform}`);
         } catch (e) {
           rawTokenInfo.longLivedAccessToken = userAccessToken;
         }
@@ -4877,33 +4896,19 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
           console.error("Meta profile fetch error:", e.message);
         }
 
-        // Check currently granted permissions
+        // Check currently granted permissions safely without logging raw tokens
         let grantedPermissions: string[] = [];
         try {
           const permRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/permissions?access_token=${activeToken}`);
           grantedPermissions = (permRes.data.data || [])
             .filter((p: any) => p.status === "granted")
             .map((p: any) => p.permission);
+          console.log(`[META PERMISSIONS AUDIT] Granted permissions for ${platform}: ${grantedPermissions.join(", ") || "none"}`);
         } catch (e: any) {
           console.error("Meta permissions check error:", e.message);
         }
 
-        // Enforce required permissions
-        let requiredPermissions: string[] = [];
-        if (platform === "facebook") {
-          requiredPermissions = ["public_profile"];
-        } else if (platform === "instagram") {
-          requiredPermissions = ["instagram_basic"];
-        } else if (platform === "whatsapp") {
-          requiredPermissions = ["public_profile"];
-        }
-
-        const missingPermissions = requiredPermissions.filter(p => !grantedPermissions.includes(p));
-        if (missingPermissions.length > 0) {
-          console.warn(`[META PERMISSIONS WARNING] Missing permissions: ${missingPermissions.join(", ")}. Proceeding to fetch connected assets...`);
-        }
-
-        // Fetch assets
+        // Fetch assets from actual returned Meta token response
         if (platform === "facebook") {
           const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts?access_token=${activeToken}`);
           if (pagesRes.data && pagesRes.data.data) {
@@ -4913,6 +4918,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               accessToken: p.access_token,
               type: "Live Page"
             }));
+            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Facebook Page(s) for user.`);
           }
         } else if (platform === "instagram") {
           const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts?access_token=${activeToken}`);
@@ -4935,6 +4941,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 console.error("IG detail load failed for page:", p.name, errInner);
               }
             }
+            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Instagram Business account(s).`);
           }
         } else if (platform === "whatsapp") {
           const wabaRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/whatsapp_business_accounts?access_token=${activeToken}`);
@@ -4957,6 +4964,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 console.error("WA Phone list load failed for WABA:", waba.name, errInner);
               }
             }
+            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} WhatsApp Business phone asset(s).`);
           }
         }
       } else if (platform === "google") {
@@ -5009,7 +5017,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     console.log("===============================");
 
     errorMessage = err.response?.data?.error?.message || err.message;
-    console.error("[OAUTH RETRIEVAL ERROR]", errorMessage);
+    console.error(`[OAUTH TOKEN] Token exchange failure for platform ${platform}: ${errorMessage}`);
 
     isFallback = true;
     }

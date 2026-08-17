@@ -87,6 +87,53 @@ export const ConnectedAccounts: React.FC = () => {
 
   React.useEffect(() => {
     fetchConnections();
+
+    // Expose global checkLoginState for Meta login button callbacks
+    (window as any).checkLoginState = () => {
+      if (typeof window !== 'undefined' && (window as any).FB) {
+        (window as any).FB.getLoginStatus((response: any) => {
+          if (response && response.status === 'connected' && response.authResponse?.accessToken) {
+            fetch(getApiUrl('/api/social/connect-direct'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
+              },
+              body: JSON.stringify({
+                facebookAccessToken: response.authResponse.accessToken
+              })
+            })
+              .then(res => res.json())
+              .then(() => {
+                showAlert('success', 'Facebook account paired successfully!');
+                fetchConnections();
+              });
+          }
+        });
+      }
+    };
+
+    // Auto-check existing Facebook login status via JS SDK
+    if (typeof window !== 'undefined' && (window as any).FB) {
+      try {
+        (window as any).FB.getLoginStatus((response: any) => {
+          if (response && response.status === 'connected' && response.authResponse?.accessToken) {
+            fetch(getApiUrl('/api/social/connect-direct'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
+              },
+              body: JSON.stringify({
+                facebookAccessToken: response.authResponse.accessToken
+              })
+            }).then(() => fetchConnections());
+          }
+        });
+      } catch (err) {
+        console.warn('FB.getLoginStatus check skipped:', err);
+      }
+    }
   }, []);
 
   const showAlert = (type: 'success' | 'error', message: string) => {
@@ -110,15 +157,16 @@ export const ConnectedAccounts: React.FC = () => {
       }
       const { url, isSandbox } = await res.json();
 
-      if (isSandbox) {
-        // Run sandbox interactive modal / popup flow
-        const width = 600;
-        const height = 650;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
 
+      const targetUrl = isSandbox ? `/auth/social-sandbox?platform=${platform}` : url;
+
+      if (targetUrl) {
         const popup = window.open(
-          `/auth/social-sandbox?platform=${platform}`,
+          targetUrl,
           `Connect ${platform}`,
           `width=${width},height=${height},left=${left},top=${top}`
         );
@@ -130,11 +178,6 @@ export const ConnectedAccounts: React.FC = () => {
             fetchConnections();
           }
         }, 1000);
-        return;
-      }
-
-      if (url) {
-        window.location.href = url;
       }
     } catch (err: any) {
       showAlert('error', err.message || 'Failed to initiate social connection.');
