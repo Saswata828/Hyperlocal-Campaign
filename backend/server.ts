@@ -135,6 +135,9 @@ const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
 const tempOAuthCache: { [key: string]: any[] } = {};
 
+// Diagnostic audit log for OAuth debugging (redacted, no tokens stored)
+const oauthDebugAuditCache: { [key: string]: any } = {};
+
 function sanitizeForLogging(obj: any): any {
   if (!obj) return obj;
   if (typeof obj !== 'object') return obj;
@@ -4829,6 +4832,18 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   });
 });
 
+app.get("/api/social/debug-status", authGuard, (req: any, res) => {
+  const userEmail = (req.user?.email || "").toLowerCase().trim();
+  const audit = oauthDebugAuditCache[userEmail] || {
+    status: "No OAuth attempts logged yet for this user session."
+  };
+  res.json({
+    success: true,
+    userEmail,
+    audit
+  });
+});
+
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
   const { code, state } = req.query;
@@ -4959,11 +4974,81 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               }
             });
             const status = pagesRes.status;
-            const pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
+            let pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
             const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
 
             console.log(`[META /me/accounts RESPONSE] HTTP Status: ${status} | Returned Pages Count: ${pagesData.length}`);
             console.log(`[META /me/accounts RAW DATA] (Sanitized for logging):`, JSON.stringify(sanitizedResponseData, null, 2));
+
+            // Fallback 1: Check granular_scopes target_ids if /me/accounts returned empty array
+            if (pagesData.length === 0 && tokenDebugInfo?.granular_scopes) {
+              console.log(`[META FALLBACK 1] Inspecting granular_scopes target_ids for Business Login selections...`);
+              const targetPageIds = new Set<string>();
+              for (const gs of tokenDebugInfo.granular_scopes) {
+                if (gs.target_ids && Array.isArray(gs.target_ids)) {
+                  gs.target_ids.forEach((tid: string) => targetPageIds.add(tid));
+                }
+              }
+              if (targetPageIds.size > 0) {
+                console.log(`[META FALLBACK 1] Found ${targetPageIds.size} target Page ID(s) in granular_scopes: [${Array.from(targetPageIds).join(", ")}]`);
+                for (const targetId of targetPageIds) {
+                  try {
+                    const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                      params: {
+                        fields: "id,name,access_token,tasks,instagram_business_account",
+                        access_token: activeToken
+                      }
+                    });
+                    if (singlePageRes.data && singlePageRes.data.id && singlePageRes.data.name) {
+                      console.log(`[META FALLBACK 1 SUCCESS] Retrieved Page via direct ID lookup: ${singlePageRes.data.name} (${singlePageRes.data.id})`);
+                      pagesData.push(singlePageRes.data);
+                    }
+                  } catch (spErr: any) {
+                    console.warn(`[META FALLBACK 1 WARN] Direct page lookup failed for ID ${targetId}:`, spErr.message);
+                  }
+                }
+              }
+            }
+
+            // Fallback 2: Check Business Manager accounts if pagesData is still empty
+            if (pagesData.length === 0) {
+              try {
+                console.log(`[META FALLBACK 2] Requesting /me/businesses for Business Manager page discovery...`);
+                const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
+                  params: { access_token: activeToken }
+                });
+                const bizList = bizRes.data?.data || [];
+                if (bizList.length > 0) {
+                  console.log(`[META FALLBACK 2] Found ${bizList.length} Business Manager account(s). Querying owned and client pages...`);
+                  for (const biz of bizList) {
+                    try {
+                      const clientPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/client_pages`, {
+                        params: {
+                          fields: "id,name,access_token,tasks,instagram_business_account",
+                          access_token: activeToken
+                        }
+                      });
+                      if (clientPagesRes.data?.data) {
+                        clientPagesRes.data.data.forEach((cp: any) => pagesData.push(cp));
+                      }
+                    } catch (e: any) {}
+                    try {
+                      const ownedPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/owned_pages`, {
+                        params: {
+                          fields: "id,name,access_token,tasks,instagram_business_account",
+                          access_token: activeToken
+                        }
+                      });
+                      if (ownedPagesRes.data?.data) {
+                        ownedPagesRes.data.data.forEach((op: any) => pagesData.push(op));
+                      }
+                    } catch (e: any) {}
+                  }
+                }
+              } catch (bizErr: any) {
+                console.log(`[META FALLBACK 2 INFO] /me/businesses query:`, bizErr.message);
+              }
+            }
 
             if (pagesData.length > 0) {
               for (const p of pagesData) {
@@ -5002,7 +5087,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
             } else {
               // CASE A: Meta OAuth succeeds but /me/accounts returns an empty data array
-              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages.`);
+              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages after all discovery attempts.`);
               const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
               const missingPerms = requiredPagePerms.filter(perm => !grantedPermissions.includes(perm));
 
@@ -5151,6 +5236,31 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     isFallback = true;
   }
 
+  const userEmail = email.toLowerCase().trim() || (req.user?.email || "").toLowerCase().trim() || "anonymous";
+  if (userEmail && userEmail !== "anonymous") {
+    oauthDebugAuditCache[userEmail] = {
+      platform,
+      timestamp: new Date().toISOString(),
+      email: userEmail,
+      profileName,
+      grantedPermissions: typeof grantedPermissions !== 'undefined' ? grantedPermissions : [],
+      tokenValid: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.is_valid : false,
+      tokenAppId: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.app_id : "N/A",
+      tokenType: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.type : "N/A",
+      tokenScopes: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.scopes : [],
+      granularScopes: typeof tokenDebugInfo !== 'undefined' ? tokenDebugInfo?.granular_scopes : [],
+      discoveredPagesCount: options.length,
+      discoveredPages: options.map(opt => ({
+        id: opt.id,
+        name: opt.name,
+        type: opt.type,
+        hasAccessToken: !!opt.accessToken,
+        instagramConnected: !!opt.instagramBusinessAccount
+      })),
+      lastErrorMessage: errorMessage || null
+    };
+  }
+
   // Handle errors for real OAuth flows cleanly
   if (errorMessage || options.length === 0 || !code) {
     const displayError = errorMessage || (options.length === 0 ? `No Facebook Pages or manageable assets were returned by Meta for this account. Please verify that: 1) You manage at least one active Facebook Page, 2) You selected your Page during the Facebook Login dialog, and 3) Your Meta Business Login configuration has the required permissions (pages_show_list, pages_read_engagement, pages_manage_posts).` : "Authorization code is missing. Direct access to callback without authorization code is not allowed.");
@@ -5165,10 +5275,18 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
           <div class="bg-white border border-rose-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
             <div class="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-black text-xl">⚠️</div>
-            <h1 class="text-sm font-black text-slate-900 tracking-tight">${platform.toUpperCase()} Authentication Failed</h1>
+            <h1 class="text-sm font-black text-slate-900 tracking-tight">${platform.toUpperCase()} Authentication Notice</h1>
             <p class="text-[11px] text-slate-500 font-semibold leading-relaxed">
               ${displayError}
             </p>
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] font-medium text-amber-800 text-left space-y-1.5">
+              <strong>💡 Meta Configuration Checklist:</strong>
+              <ul class="list-disc pl-4 space-y-1 text-[10.5px]">
+                <li>Verify your Facebook account is an Admin/Editor of the Page.</li>
+                <li>Ensure you explicitly check the box for your Facebook Page in the Meta consent window.</li>
+                <li>Check your server debug status endpoint at <code class="bg-amber-100 px-1 rounded">/api/social/debug-status</code> for detailed diagnostic metrics.</li>
+              </ul>
+            </div>
             <button onclick="window.close()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow cursor-pointer">
               Close Window
             </button>
@@ -5179,7 +5297,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   }
 
   // Cache access tokens securely on the backend
-  const userEmail = email || (req.user?.email) || "anonymous";
   const cacheKey = `${userEmail.toLowerCase().trim()}-${platform}`;
   tempOAuthCache[cacheKey] = options;
 
