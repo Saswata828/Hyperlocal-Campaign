@@ -4878,6 +4878,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   if (code && isStateValid) {
     try {
       if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
+        console.log(`[META OAUTH SEQUENCE Step 1/6] OAuth authorization code received from Meta callback.`);
         console.log(`[OAUTH TOKEN] Initiating token exchange for platform: ${platform}`);
         const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
           params: {
@@ -4889,7 +4890,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         });
         const userAccessToken = tokenRes.data.access_token;
         rawTokenInfo.userAccessToken = userAccessToken;
-        console.log(`[OAUTH TOKEN] Token exchange successful for platform: ${platform}`);
+        console.log(`[META OAUTH SEQUENCE Step 2/6] Authorization code exchanged for User Access Token successfully.`);
 
         // Exchange for long-lived access token
         try {
@@ -4902,19 +4903,19 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             }
           });
           rawTokenInfo.longLivedAccessToken = longLivedRes.data.access_token;
-          console.log(`[OAUTH TOKEN] Long-lived token exchange successful for platform: ${platform}`);
+          console.log(`[OAUTH TOKEN] Long-lived User Access Token exchange successful for platform: ${platform}`);
         } catch (e) {
           rawTokenInfo.longLivedAccessToken = userAccessToken;
         }
 
         const activeToken = rawTokenInfo.longLivedAccessToken;
 
-        // Fetch basic profile info
+        // Step 3: Fetch basic profile info (/me)
         try {
           const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=id,name,picture&access_token=${activeToken}`);
           profileName = profileRes.data.name || profileName;
           profilePic = profileRes.data.picture?.data?.url || profilePic;
-          console.log(`[META /me RESPONSE] HTTP Status: ${profileRes.status} | User ID: ${profileRes.data?.id} | Name: ${profileRes.data?.name}`);
+          console.log(`[META OAUTH SEQUENCE Step 3/6] GET /me completed. User ID: ${profileRes.data?.id} | Name: ${profileRes.data?.name}`);
         } catch (e: any) {
           console.error(`[META /me ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
@@ -4947,73 +4948,126 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
           console.error(`[META TOKEN DEBUG ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
         }
 
-        // Fetch assets from actual returned Meta token response
+        // Step 4 & 5: Fetch assets from actual returned Meta token response
         if (platform === "facebook") {
           try {
-            console.log(`[META /me/accounts CALL] Requesting Facebook Pages for active token...`);
+            console.log(`[META OAUTH SEQUENCE Step 4/6] Requesting GET /me/accounts?fields=id,name,access_token,tasks,instagram_business_account with User Access Token...`);
             const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
-              params: { access_token: activeToken }
+              params: {
+                fields: "id,name,access_token,tasks,instagram_business_account",
+                access_token: activeToken
+              }
             });
             const status = pagesRes.status;
-            const pagesData = pagesRes.data?.data || [];
+            const pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
             const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
 
             console.log(`[META /me/accounts RESPONSE] HTTP Status: ${status} | Returned Pages Count: ${pagesData.length}`);
-            console.log(`[META /me/accounts RESPONSE DATA]:`, JSON.stringify(sanitizedResponseData, null, 2));
+            console.log(`[META /me/accounts RAW DATA] (Sanitized for logging):`, JSON.stringify(sanitizedResponseData, null, 2));
 
             if (pagesData.length > 0) {
-              options = pagesData.map((p: any) => ({
-                id: p.id,
-                name: p.name,
-                accessToken: p.access_token,
-                type: "Live Page"
-              }));
-              console.log(`[META ASSET DISCOVERY SUCCESS] Discovered ${options.length} Facebook Page(s) for user.`);
+              for (const p of pagesData) {
+                console.log(`[META OAUTH SEQUENCE Step 5/6] Page discovered: ID ${p.id} | Name: ${p.name} | Tasks: [${(p.tasks || []).join(", ")}]`);
+                console.log(`[META OAUTH SEQUENCE Step 5b/6] Page Access Token obtained for Page ID: ${p.id}`);
+
+                let igInfo: any = null;
+                if (p.instagram_business_account && p.instagram_business_account.id) {
+                  const igId = p.instagram_business_account.id;
+                  console.log(`[META OAUTH SEQUENCE Step 6/6] Connected Instagram Professional Account detected on Page ${p.name} (IG ID: ${igId})`);
+                  try {
+                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
+                    igInfo = {
+                      id: igId,
+                      username: igDetail.data.username,
+                      name: igDetail.data.name || igDetail.data.username,
+                      avatar: igDetail.data.profile_picture_url || ""
+                    };
+                    console.log(`[META INSTAGRAM SUCCESS] IG Account: @${igDetail.data.username} (${igDetail.data.name}) linked to Page ${p.name}`);
+                  } catch (igErr: any) {
+                    console.error(`[META INSTAGRAM FETCH ERROR] Failed to fetch IG details for ID ${igId}:`, igErr.message);
+                  }
+                } else {
+                  console.log(`[META OAUTH SEQUENCE Step 6/6] No Instagram Professional Account linked to Facebook Page: ${p.name}`);
+                }
+
+                options.push({
+                  id: p.id,
+                  name: p.name,
+                  accessToken: p.access_token,
+                  tasks: p.tasks || [],
+                  instagramBusinessAccount: igInfo,
+                  type: "Live Page"
+                });
+              }
+              console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
             } else {
-              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC]: /me/accounts returned 0 pages.`);
+              // CASE A: Meta OAuth succeeds but /me/accounts returns an empty data array
+              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages.`);
               const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
-              const missingPerms = requiredPagePerms.filter(p => !grantedPermissions.includes(p));
+              const missingPerms = requiredPagePerms.filter(perm => !grantedPermissions.includes(perm));
 
               if (missingPerms.length > 0) {
                 console.warn(`[DIAGNOSTIC CAUSE]: Required Page permissions missing from token: [${missingPerms.join(", ")}]. Granted permissions were: [${grantedPermissions.join(", ")}].`);
               } else {
-                console.warn(`[DIAGNOSTIC CAUSE]: Permissions present [${grantedPermissions.join(", ")}], but 0 pages returned. Potential root causes: 1) User owns/manages no Facebook Pages, 2) During Facebook Login for Business dialog, user did not select/grant any specific Facebook Page to the app, 3) Token type '${tokenDebugInfo?.type || 'UNKNOWN'}' or Business Login configuration settings restrict page access.`);
+                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages returned. Potential causes: 1) User owns/manages no Facebook Pages, 2) During Meta Business Login dialog, user did not select/grant any specific Facebook Page to the app, 3) Token type '${tokenDebugInfo?.type || 'UNKNOWN'}' or Business Login configuration settings restrict page access.`);
               }
+
+              errorMessage = "No Facebook Pages are available for this Facebook account. Make sure you are an administrator/task-enabled user of at least one Facebook Page and selected the Page during Meta authorization.";
+              isFallback = true;
             }
           } catch (err: any) {
+            // CASE B: Meta returns an OAuth/API error
             const httpStatus = err.response?.status;
             const metaError = err.response?.data?.error;
             console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
             if (metaError) {
               console.error(`[META ERROR DETAILS] Code: ${metaError.code} | Subcode: ${metaError.error_subcode || 'N/A'} | Type: ${metaError.type} | Message: ${metaError.message}`);
+              errorMessage = `Meta Authorization Error (${metaError.code}): ${metaError.message}`;
             } else {
               console.error(`[META ERROR RAW]:`, err.message);
+              errorMessage = `Meta API Error (${httpStatus}): ${err.message}`;
             }
-            errorMessage = metaError?.message || `Meta API Error (${httpStatus}): ${err.message}`;
             isFallback = true;
           }
         } else if (platform === "instagram") {
-          const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts?access_token=${activeToken}`);
-          if (pagesRes.data && pagesRes.data.data) {
-            for (const p of pagesRes.data.data) {
-              try {
-                const pageDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${p.id}?fields=instagram_business_account&access_token=${p.access_token}`);
-                if (pageDetail.data && pageDetail.data.instagram_business_account) {
-                  const igId = pageDetail.data.instagram_business_account.id;
-                  const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
-                  options.push({
-                    id: igId,
-                    name: igDetail.data.name || igDetail.data.username,
-                    accessToken: p.access_token,
-                    avatar: igDetail.data.profile_picture_url || "",
-                    type: "Live Instagram Business"
-                  });
-                }
-              } catch (errInner) {
-                console.error("IG detail load failed for page:", p.name, errInner);
+          try {
+            console.log(`[META /me/accounts CALL] Requesting Facebook Pages for Instagram discovery...`);
+            const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+              params: {
+                fields: "id,name,access_token,tasks,instagram_business_account",
+                access_token: activeToken
               }
+            });
+            const pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
+            if (pagesData.length > 0) {
+              for (const p of pagesData) {
+                try {
+                  if (p.instagram_business_account && p.instagram_business_account.id) {
+                    const igId = p.instagram_business_account.id;
+                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
+                    options.push({
+                      id: igId,
+                      name: igDetail.data.name || igDetail.data.username,
+                      accessToken: p.access_token,
+                      avatar: igDetail.data.profile_picture_url || "",
+                      pageId: p.id,
+                      pageName: p.name,
+                      type: "Live Instagram Business"
+                    });
+                  }
+                } catch (errInner: any) {
+                  console.error("IG detail load failed for page:", p.name, errInner.message);
+                }
+              }
+              console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Instagram Business account(s).`);
+            } else {
+              errorMessage = "No Facebook Pages with linked Instagram Professional accounts were found for this account.";
+              isFallback = true;
             }
-            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Instagram Business account(s).`);
+          } catch (err: any) {
+            const metaError = err.response?.data?.error;
+            errorMessage = metaError?.message || err.message;
+            isFallback = true;
           }
         } else if (platform === "whatsapp") {
           const wabaRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/whatsapp_business_accounts?access_token=${activeToken}`);
