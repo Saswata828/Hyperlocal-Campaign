@@ -130,7 +130,7 @@ const META_VERSION = process.env.META_API_VERSION || process.env.META_GRAPH_API_
 const META_APP_ID = process.env.META_APP_ID || process.env.FACEBOOK_APP_ID || "";
 const META_APP_SECRET = process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "";
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI || "";
-const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || "";
+const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || "1058245473731313";
 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
 const tempOAuthCache: { [key: string]: any[] } = {};
@@ -4800,12 +4800,12 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
 
   if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
     if (configId) {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&config_id=${configId}&response_type=code&state=${encodeURIComponent(state)}`;
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&config_id=${configId}&response_type=code&override_default_response_type=true&state=${encodeURIComponent(state)}`;
     } else {
       if (platform === "whatsapp") {
         providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
       } else {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,pages_read_user_content,pages_manage_metadata,business_management,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email&state=${encodeURIComponent(state)}`;
       }
     }
   } else if (platform === "google") {
