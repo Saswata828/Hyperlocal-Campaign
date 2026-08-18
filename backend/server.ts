@@ -5310,6 +5310,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 avatar: profilePic || "",
                 type: "Authenticated Facebook Account"
               });
+              errorMessage = "";
               console.log(`[META FALLBACK SUCCESS] Added authenticated user profile asset: ${profileName} (${profileId})`);
             }
           } catch (err: any) {
@@ -5317,14 +5318,24 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             const metaError = err.response?.data?.error;
             pagesHttpStatus = httpStatus || "ERROR";
             console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
-            if (metaError) {
-              console.error(`[META ERROR DETAILS] Code: ${metaError.code} | Subcode: ${metaError.error_subcode || 'N/A'} | Type: ${metaError.type} | Message: ${metaError.message}`);
-              errorMessage = `Meta Authorization Error (${metaError.code}): ${metaError.message}`;
+            if (activeToken) {
+              options.push({
+                id: profileId || `fb-profile-${Date.now()}`,
+                name: `${profileName} (Facebook Profile)`,
+                accessToken: activeToken,
+                avatar: profilePic || "",
+                type: "Authenticated Facebook Account"
+              });
+              errorMessage = "";
+              console.log(`[META FALLBACK AFTER CATCH] Added profile fallback asset: ${profileName}`);
             } else {
-              console.error(`[META ERROR RAW]:`, err.message);
-              errorMessage = `Meta API Error (${httpStatus}): ${err.message}`;
+              if (metaError) {
+                errorMessage = `Meta Authorization Error (${metaError.code}): ${metaError.message}`;
+              } else {
+                errorMessage = `Meta API Error (${httpStatus}): ${err.message}`;
+              }
+              isFallback = true;
             }
-            isFallback = true;
           }
         } else if (platform === "instagram") {
           try {
@@ -5502,8 +5513,8 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   oauthDebugAuditCache["latest"] = auditReport;
 
   // Handle errors for real OAuth flows cleanly
-  if (errorMessage || options.length === 0 || !code) {
-    const displayError = errorMessage || (options.length === 0 ? `No Facebook Pages or manageable assets were returned by Meta for this account. Please verify that: 1) You manage at least one active Facebook Page, 2) You selected your Page during the Facebook Login dialog, and 3) Your Meta Business Login configuration has the required permissions (pages_show_list, pages_read_engagement, pages_manage_posts).` : "Authorization code is missing. Direct access to callback without authorization code is not allowed.");
+  if ((errorMessage && options.length === 0) || !code) {
+    const displayError = errorMessage || "Authorization code is missing. Direct access to callback without authorization code is not allowed.";
     return res.send(`
       <html>
         <head>
