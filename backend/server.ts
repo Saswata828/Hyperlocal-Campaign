@@ -5243,31 +5243,14 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                   }
                   console.log(`[META ASSET DISCOVERY RESULT] Total selectable assets resolved: ${options.length}`);
                 } else {
-                  console.warn(`[META /me/accounts EMPTY] 0 pages returned. Adding authenticated user profile fallback...`);
-                  options.push({
-                    id: profileId || `fb-profile-${Date.now()}`,
-                    name: `${profileName} (Facebook Account)`,
-                    accessToken: activeToken,
-                    avatar: profilePic || "",
-                    type: "Authenticated Facebook Account"
-                  });
-                  errorMessage = "";
+                  console.warn(`[META ASSET DISCOVERY WARN] 0 Facebook Pages resolved from Meta authorization.`);
+                  errorMessage = "No Facebook Page could be resolved from the Meta authorization. No fallback account will be created.";
+                  isFallback = true;
                 }
               } catch (err: any) {
                 logMetaGraphError("Facebook Asset Discovery", "all", err);
-                if (activeToken) {
-                  options.push({
-                    id: profileId || `fb-profile-${Date.now()}`,
-                    name: `${profileName} (Facebook Account)`,
-                    accessToken: activeToken,
-                    avatar: profilePic || "",
-                    type: "Authenticated Facebook Account"
-                  });
-                  errorMessage = "";
-                } else {
-                  errorMessage = err.response?.data?.error?.message || err.message;
-                  isFallback = true;
-                }
+                errorMessage = err.response?.data?.error?.message || err.message || "Failed to resolve Facebook Page from Meta Graph API.";
+                isFallback = true;
               }
             } else if (platform === "instagram") {
               try {
@@ -5301,29 +5284,12 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                   }
                 }
                 if (options.length === 0) {
-                  options.push({
-                    id: profileId || `ig-user-${Date.now()}`,
-                    name: `${profileName} (Instagram Profile)`,
-                    accessToken: activeToken,
-                    avatar: profilePic || "",
-                    type: "Authenticated Instagram User"
-                  });
-                  errorMessage = "";
-                }
-              } catch (err: any) {
-                if (activeToken) {
-                  options.push({
-                    id: profileId || `ig-user-${Date.now()}`,
-                    name: `${profileName} (Instagram Profile)`,
-                    accessToken: activeToken,
-                    avatar: profilePic || "",
-                    type: "Authenticated Instagram User"
-                  });
-                  errorMessage = "";
-                } else {
-                  errorMessage = err.response?.data?.error?.message || err.message;
+                  errorMessage = "No Instagram Professional accounts linked to a Facebook Page were found for this account.";
                   isFallback = true;
                 }
+              } catch (err: any) {
+                errorMessage = err.response?.data?.error?.message || err.message;
+                isFallback = true;
               }
             } else if (platform === "whatsapp") {
               try {
