@@ -5103,7 +5103,7 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
   console.error(`[META GRAPH API ERROR] Endpoint: ${endpoint} | Asset ID: ${assetId} | HTTP Status: ${httpStatus} | Error Code: ${metaError.code || 'N/A'} | Error Type: ${metaError.type || 'N/A'} | Error Message: ${metaError.message || err.message}`);
 }
 
-            // Step 4 & 5: Fetch assets from actual returned Meta token response
+            // Step 4 & 5: Fetch assets strictly from actual returned Meta Graph API response
             if (platform === "facebook") {
               try {
                 console.log(`[META OAUTH STEP 4/6] Requesting GET /me/accounts with User Access Token...`);
@@ -5122,9 +5122,8 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                   logMetaGraphError("GET /me/accounts", "me", meAccErr);
                 }
 
-                // Extract target Page IDs from debug_token, /me/permissions, and explicit known Page ID
+                // Extract target Page IDs dynamically from debug_token and /me/permissions granular_scopes ONLY
                 const targetPageIds = new Set<string>();
-                targetPageIds.add("1340053172514256"); // Hyperlocal Campaign Test Page ID
 
                 if (tokenDebugInfo?.granular_scopes && Array.isArray(tokenDebugInfo.granular_scopes)) {
                   for (const gs of tokenDebugInfo.granular_scopes) {
@@ -5134,77 +5133,79 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                   }
                 }
 
-                console.log(`[META BUSINESS LOGIN DISCOVERY] Target Page IDs to resolve (${targetPageIds.size}): [${Array.from(targetPageIds).join(", ")}]`);
+                if (targetPageIds.size > 0) {
+                  console.log(`[META BUSINESS LOGIN DISCOVERY] Dynamic Target Page IDs from granular scopes (${targetPageIds.size}): [${Array.from(targetPageIds).join(", ")}]`);
 
-                for (const targetId of targetPageIds) {
-                  const alreadyPresent = pagesData.some(p => p && p.id === targetId);
-                  if (!alreadyPresent) {
-                    let pageData: any = null;
-                    // Attempt 1: Full fields
-                    try {
-                      const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
-                        params: {
-                          fields: "id,name,access_token,tasks,instagram_business_account",
-                          access_token: activeToken
-                        }
-                      });
-                      if (singlePageRes.data && singlePageRes.data.id) {
-                        pageData = singlePageRes.data;
-                      }
-                    } catch (err1: any) {
-                      logMetaGraphError(`GET /${targetId} (full fields)`, targetId, err1);
-                    }
-
-                    // Attempt 2: Basic fields if Attempt 1 failed
-                    if (!pageData) {
+                  for (const targetId of targetPageIds) {
+                    const alreadyPresent = pagesData.some(p => p && p.id === targetId);
+                    if (!alreadyPresent) {
+                      let pageData: any = null;
+                      // Attempt 1: Full fields
                       try {
                         const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
                           params: {
-                            fields: "id,name,instagram_business_account",
+                            fields: "id,name,access_token,tasks,instagram_business_account",
                             access_token: activeToken
                           }
                         });
                         if (singlePageRes.data && singlePageRes.data.id) {
                           pageData = singlePageRes.data;
                         }
-                      } catch (err2: any) {
-                        logMetaGraphError(`GET /${targetId} (basic fields)`, targetId, err2);
+                      } catch (err1: any) {
+                        logMetaGraphError(`GET /${targetId} (full fields)`, targetId, err1);
                       }
-                    }
 
-                    // Attempt 3: Minimal fields
-                    if (!pageData) {
-                      try {
-                        const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
-                          params: {
-                            fields: "id,name",
-                            access_token: activeToken
+                      // Attempt 2: Basic fields if Attempt 1 failed
+                      if (!pageData) {
+                        try {
+                          const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                            params: {
+                              fields: "id,name,instagram_business_account",
+                              access_token: activeToken
+                            }
+                          });
+                          if (singlePageRes.data && singlePageRes.data.id) {
+                            pageData = singlePageRes.data;
                           }
-                        });
-                        if (singlePageRes.data && singlePageRes.data.id) {
-                          pageData = singlePageRes.data;
+                        } catch (err2: any) {
+                          logMetaGraphError(`GET /${targetId} (basic fields)`, targetId, err2);
                         }
-                      } catch (err3: any) {
-                        logMetaGraphError(`GET /${targetId} (minimal fields)`, targetId, err3);
                       }
-                    }
 
-                    if (pageData && pageData.id) {
-                      console.log(`[META BUSINESS LOGIN DISCOVERY SUCCESS] Resolved Facebook Page: ${pageData.name || 'Hyperlocal Campaign Test'} (${pageData.id})`);
-                      pagesData.push(pageData);
+                      // Attempt 3: Minimal fields
+                      if (!pageData) {
+                        try {
+                          const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                            params: {
+                              fields: "id,name",
+                              access_token: activeToken
+                            }
+                          });
+                          if (singlePageRes.data && singlePageRes.data.id) {
+                            pageData = singlePageRes.data;
+                          }
+                        } catch (err3: any) {
+                          logMetaGraphError(`GET /${targetId} (minimal fields)`, targetId, err3);
+                        }
+                      }
+
+                      if (pageData && pageData.id && pageData.name) {
+                        console.log(`[META BUSINESS LOGIN DISCOVERY SUCCESS] Resolved Facebook Page: ${pageData.name} (${pageData.id})`);
+                        pagesData.push(pageData);
+                      }
                     }
                   }
                 }
 
                 if (pagesData.length > 0) {
                   for (const p of pagesData) {
-                    if (!p || !p.id) continue;
+                    if (!p || !p.id || !p.name) continue;
                     const pageId = p.id;
-                    const pageName = p.name || (pageId === "1340053172514256" ? "Hyperlocal Campaign Test" : "Facebook Page");
+                    const pageName = p.name;
                     const pageToken = p.access_token || activeToken;
 
                     let igInfo: any = null;
-                    let igId = p.instagram_business_account?.id || (pageId === "1340053172514256" ? "17841432767861455" : null);
+                    let igId = p.instagram_business_account?.id || null;
 
                     if (igId) {
                       try {
@@ -5214,21 +5215,17 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                             access_token: pageToken
                           }
                         });
-                        igInfo = {
-                          id: igId,
-                          username: igDetail.data?.username || "hyperlocalcampaign.ai",
-                          name: igDetail.data?.name || igDetail.data?.username || "hyperlocalcampaign.ai",
-                          avatar: igDetail.data?.profile_picture_url || ""
-                        };
-                        console.log(`[META INSTAGRAM DISCOVERY SUCCESS] Linked Instagram Account: @${igInfo.username} (${igId})`);
+                        if (igDetail.data && igDetail.data.id) {
+                          igInfo = {
+                            id: igId,
+                            username: igDetail.data.username || igId,
+                            name: igDetail.data.name || igDetail.data.username || igId,
+                            avatar: igDetail.data.profile_picture_url || ""
+                          };
+                          console.log(`[META INSTAGRAM DISCOVERY SUCCESS] Linked Instagram Account: @${igInfo.username} (${igId})`);
+                        }
                       } catch (igErr: any) {
                         logMetaGraphError(`GET /${igId}`, igId, igErr);
-                        igInfo = {
-                          id: igId,
-                          username: "hyperlocalcampaign.ai",
-                          name: "hyperlocalcampaign.ai",
-                          avatar: ""
-                        };
                       }
                     }
 
@@ -5241,10 +5238,10 @@ function logMetaGraphError(endpoint: string, assetId: string, err: any) {
                       type: "Live Page"
                     });
                   }
-                  console.log(`[META ASSET DISCOVERY RESULT] Total selectable assets resolved: ${options.length}`);
+                  console.log(`[META ASSET DISCOVERY RESULT] Total selectable real assets returned by Meta Graph API: ${options.length}`);
                 } else {
-                  console.warn(`[META ASSET DISCOVERY WARN] 0 Facebook Pages resolved from Meta authorization.`);
-                  errorMessage = "No Facebook Page could be resolved from the Meta authorization. No fallback account will be created.";
+                  console.warn(`[META ASSET DISCOVERY WARN] 0 Facebook Pages returned by Meta Graph API for this account.`);
+                  errorMessage = "No Facebook Pages were found for this Meta account.";
                   isFallback = true;
                 }
               } catch (err: any) {
