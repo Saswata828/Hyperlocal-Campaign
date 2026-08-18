@@ -4857,6 +4857,103 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
   });
 });
 
+app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
+  const userEmail = (req.user?.email || "").toLowerCase().trim();
+  const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"];
+  const activeToken = audit?.activeToken || tempOAuthCache[`${userEmail}-facebook`]?.[0]?.accessToken;
+
+  if (!activeToken) {
+    return res.status(400).json({
+      error: "No active Facebook User Access Token found in active session. Please authenticate via Facebook OAuth first."
+    });
+  }
+
+  let userRequest: any = { status: null, data: null, error: null };
+  let pagesRequest: any = { status: null, pageCount: 0, pages: [], error: null };
+
+  // 1. Query GET /me?fields=id,name
+  try {
+    const meRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me`, {
+      params: {
+        fields: "id,name",
+        access_token: activeToken
+      }
+    });
+    userRequest.status = meRes.status;
+    userRequest.data = {
+      id: meRes.data?.id || null,
+      name: meRes.data?.name || null
+    };
+    userRequest.error = null;
+  } catch (err: any) {
+    userRequest.status = err.response?.status || 500;
+    userRequest.data = null;
+    const metaError = err.response?.data?.error;
+    if (metaError) {
+      userRequest.error = {
+        message: metaError.message || "Unknown error",
+        type: metaError.type || "OAuthException",
+        code: metaError.code || 0,
+        error_subcode: metaError.error_subcode || 0
+      };
+    } else {
+      userRequest.error = {
+        message: err.message || "Request failed",
+        type: "HTTPError",
+        code: err.response?.status || 500,
+        error_subcode: 0
+      };
+    }
+  }
+
+  // 2. Query GET /me/accounts?fields=id,name,tasks
+  try {
+    const accountsRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+      params: {
+        fields: "id,name,tasks",
+        access_token: activeToken
+      }
+    });
+    pagesRequest.status = accountsRes.status;
+    const rawPages = Array.isArray(accountsRes.data?.data) ? accountsRes.data.data : [];
+    pagesRequest.pageCount = rawPages.length;
+    pagesRequest.pages = rawPages.map((p: any) => ({
+      id: p.id || null,
+      name: p.name || null,
+      tasks: p.tasks || []
+    }));
+    pagesRequest.error = null;
+  } catch (err: any) {
+    pagesRequest.status = err.response?.status || 500;
+    pagesRequest.pageCount = 0;
+    pagesRequest.pages = [];
+    const metaError = err.response?.data?.error;
+    if (metaError) {
+      pagesRequest.error = {
+        message: metaError.message || "Unknown error",
+        type: metaError.type || "OAuthException",
+        code: metaError.code || 0,
+        error_subcode: metaError.error_subcode || 0
+      };
+    } else {
+      pagesRequest.error = {
+        message: err.message || "Request failed",
+        type: "HTTPError",
+        code: err.response?.status || 500,
+        error_subcode: 0
+      };
+    }
+  }
+
+  console.log(`[META RAW DEBUG] User Request Status: ${userRequest.status} | Data:`, JSON.stringify(userRequest.data));
+  console.log(`[META RAW DEBUG] Pages Request Status: ${pagesRequest.status} | Count: ${pagesRequest.pageCount} | Pages:`, JSON.stringify(pagesRequest.pages));
+
+  res.json({
+    userRequest,
+    pagesRequest
+  });
+});
+
 app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
   const pageId = (req.query.pageId || req.body?.pageId || "").toString().trim();
   const userEmail = (req.user?.email || "").toLowerCase().trim();
@@ -5205,18 +5302,15 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               }
               console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
             } else {
-              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages after all discovery attempts.`);
-              const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
-              const missingPerms = requiredPagePerms.filter(perm => !grantedPermissions.includes(perm));
-
-              if (missingPerms.length > 0) {
-                console.warn(`[DIAGNOSTIC CAUSE]: Required Page permissions missing from token: [${missingPerms.join(", ")}]. Granted permissions were: [${grantedPermissions.join(", ")}].`);
-              } else {
-                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages returned.`);
-              }
-
-              errorMessage = "No Facebook Pages are available for this Facebook account. Make sure you are an administrator/task-enabled user of at least one Facebook Page and selected the Page during Meta authorization.";
-              isFallback = true;
+              console.warn(`[META /me/accounts EMPTY] 0 pages returned from /me/accounts. Adding authenticated user profile fallback option...`);
+              options.push({
+                id: profileId || `fb-profile-${Date.now()}`,
+                name: `${profileName} (Facebook Profile)`,
+                accessToken: activeToken,
+                avatar: profilePic || "",
+                type: "Authenticated Facebook Account"
+              });
+              console.log(`[META FALLBACK SUCCESS] Added authenticated user profile asset: ${profileName} (${profileId})`);
             }
           } catch (err: any) {
             const httpStatus = err.response?.status;
