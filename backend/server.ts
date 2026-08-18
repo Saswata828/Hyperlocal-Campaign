@@ -4946,7 +4946,7 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
   }
 
   console.log(`[META RAW DEBUG] User Request Status: ${userRequest.status} | Data:`, JSON.stringify(userRequest.data));
-  console.log(`[META RAW DEBUG] Pages Request Status: ${pagesRequest.status} | Count: ${pagesRequest.pageCount} | Pages:`, JSON.stringify(pagesRequest.pages));
+  console.log(`[META RAW DEBUG] Pages Request Status: ${pagesRequest.status} | Count: ${pagesRequest.pageCount}`);
 
   res.json({
     userRequest,
@@ -4954,651 +4954,673 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
   });
 });
 
-app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
-  const pageId = (req.query.pageId || req.body?.pageId || "").toString().trim();
-  const userEmail = (req.user?.email || "").toLowerCase().trim();
-  const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"];
-  const activeToken = audit?.activeToken || tempOAuthCache[`${userEmail}-facebook`]?.[0]?.accessToken;
-
-  if (!pageId) {
-    return res.status(400).json({
-      success: false,
-      error: "Page ID parameter is required. Usage: GET/POST /api/social/test-page-direct?pageId=YOUR_PAGE_ID"
-    });
-  }
-
-  if (!activeToken) {
-    return res.status(400).json({
-      success: false,
-      error: "No active Facebook User Access Token found in your active session. Please authenticate via Facebook OAuth first."
-    });
-  }
-
-  try {
-    console.log(`[PAGE DIRECT TEST] Testing Page ID: ${pageId} with User Access Token...`);
-    const pageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${pageId}`, {
-      params: {
-        fields: "id,name,access_token,tasks,instagram_business_account,category",
-        access_token: activeToken
-      }
-    });
-
-    const sanitizedData = sanitizeForLogging(pageRes.data);
-    console.log(`[PAGE DIRECT TEST SUCCESS] HTTP Status: ${pageRes.status} | Data:`, JSON.stringify(sanitizedData, null, 2));
-
-    let igDetails: any = null;
-    if (pageRes.data?.instagram_business_account?.id && pageRes.data?.access_token) {
-      try {
-        const igId = pageRes.data.instagram_business_account.id;
-        const igRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=id,username,name,profile_picture_url&access_token=${pageRes.data.access_token}`);
-        igDetails = igRes.data;
-      } catch (igErr: any) {
-        console.warn("[PAGE DIRECT TEST IG WARN]", igErr.message);
-      }
-    }
-
-    return res.json({
-      success: true,
-      httpStatus: pageRes.status,
-      page: {
-        id: pageRes.data.id,
-        name: pageRes.data.name,
-        category: pageRes.data.category || "N/A",
-        hasPageAccessToken: !!pageRes.data.access_token,
-        tasks: pageRes.data.tasks || [],
-        instagramBusinessAccount: igDetails ? {
-          id: igDetails.id,
-          username: igDetails.username,
-          name: igDetails.name || igDetails.username
-        } : null
-      }
-    });
-  } catch (err: any) {
-    const status = err.response?.status || 500;
-    const metaError = err.response?.data?.error;
-    console.error(`[PAGE DIRECT TEST ERROR] HTTP Status: ${status} | Error:`, sanitizeForLogging(metaError || err.message));
-
-    let classification = "D. Page exists but Graph API cannot access it";
-    if (status === 404 || metaError?.code === 100 || metaError?.code === 803) {
-      classification = "D. Page ID not found or unsupported by current Meta App credentials";
-    } else if (metaError?.code === 190) {
-      classification = "A. OAuth User Access Token is invalid or expired";
-    } else if (metaError?.code === 200 || metaError?.code === 10) {
-      classification = "C. Permission error: User or App has not been granted required Page permissions";
-    }
-
-    return res.status(status).json({
-      success: false,
-      httpStatus: status,
-      classification,
-      error: metaError ? `Meta Error (${metaError.code}): ${metaError.message}` : err.message,
-      metaErrorDetails: metaError || null
-    });
-  }
-});
-
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
-  const { code, state } = req.query;
-  const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
+  try {
+    const { code, state, format } = req.query;
+    const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
 
-  let verifiedState: any = null;
-  if (state) {
-    verifiedState = verifyOAuthState(state as string);
-  }
-
-  const reqPlatform = (req.query.platform as string) || (verifiedState ? verifiedState.platform : "facebook");
-  const platform = verifiedState?.platform || reqPlatform;
-
-  const fbClientId = META_APP_ID;
-  const fbClientSecret = META_APP_SECRET;
-
-  let options: any[] = [];
-  let isFallback = false;
-  let rawTokenInfo: any = {};
-  let errorMessage = "";
-  let profileName = "Facebook User";
-  let profileId = "";
-  let profilePic = "";
-  let email = "";
-  let grantedPermissions: string[] = [];
-  let declinedPermissions: string[] = [];
-  let tokenDebugInfo: any = null;
-  let tokenExchangeSuccess = false;
-  let pagesHttpStatus: number | string = "N/A";
-
-  let isStateValid = true;
-  if (code) {
+    let verifiedState: any = null;
     if (state) {
-      if (!verifiedState || (req.query.platform && verifiedState.platform !== req.query.platform)) {
-        console.error(`[OAUTH STATE ERROR] Invalid state parameter for platform ${platform}`);
-        isStateValid = false;
-        errorMessage = "Security validation failed: The OAuth state parameter was invalid or expired.";
-        isFallback = true;
-      } else {
-        email = verifiedState.email;
-        console.log(`[OAUTH STATE SUCCESS] Verified state for user: ${email}, platform: ${platform}`);
+      try {
+        verifiedState = verifyOAuthState(state as string);
+      } catch (stErr: any) {
+        console.warn(`[OAUTH STATE VERIFY WARN] State verification failed:`, stErr.message);
       }
-    } else {
-      console.warn(`[OAUTH STATE WARNING] Missing state parameter for platform ${platform}`);
-      isStateValid = false;
-      errorMessage = "Security validation failed: The OAuth state parameter is required.";
-      isFallback = true;
     }
-  }
 
-  console.log(`[OAUTH CALLBACK] Code present: ${!!code} | Platform: ${platform} | Redirect URI: ${redirectUri} | State Valid: ${isStateValid}`);
+    const reqPlatform = (req.query.platform as string) || (verifiedState ? verifiedState.platform : "facebook");
+    const platform = verifiedState?.platform || reqPlatform || "facebook";
 
-  if (code && isStateValid) {
-    try {
-      if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
-        console.log(`[META OAUTH SEQUENCE Step 1/6] OAuth authorization code received from Meta callback.`);
-        console.log(`[OAUTH TOKEN] Initiating token exchange with redirect_uri: ${redirectUri}`);
+    const fbClientId = META_APP_ID || "1684531366178928";
+    const fbClientSecret = META_APP_SECRET;
 
-        let userAccessToken = "";
-        try {
-          const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
-            params: {
-              client_id: fbClientId,
-              client_secret: fbClientSecret,
-              redirect_uri: redirectUri,
-              code
-            }
-          });
-          userAccessToken = tokenRes.data.access_token;
-          rawTokenInfo.userAccessToken = userAccessToken;
-          tokenExchangeSuccess = true;
-          console.log(`[META OAUTH SEQUENCE Step 2/6] Authorization code exchanged for User Access Token successfully (HTTP ${tokenRes.status}).`);
-        } catch (tokenErr: any) {
-          const status = tokenErr.response?.status || "N/A";
-          const metaError = tokenErr.response?.data?.error;
-          console.error(`[META OAUTH TOKEN EXCHANGE ERROR] HTTP Status: ${status} | Error:`, sanitizeForLogging(metaError || tokenErr.message));
-          if (metaError) {
-            errorMessage = `Meta OAuth Token Exchange Failed (${metaError.code}): ${metaError.message}`;
-          } else {
-            errorMessage = `Meta OAuth Token Exchange Failed (${status}): ${tokenErr.message}`;
-          }
+    let options: any[] = [];
+    let isFallback = false;
+    let rawTokenInfo: any = {};
+    let errorMessage = "";
+    let profileName = "Facebook User";
+    let profileId = "";
+    let profilePic = "";
+    let email = verifiedState?.email || "";
+    let grantedPermissions: string[] = [];
+    let declinedPermissions: string[] = [];
+    let tokenDebugInfo: any = null;
+    let tokenExchangeSuccess = false;
+    let pagesHttpStatus: number | string = "N/A";
+
+    let isStateValid = true;
+    if (code) {
+      if (state) {
+        if (!verifiedState || (req.query.platform && verifiedState.platform !== req.query.platform)) {
+          console.error(`[OAUTH STATE ERROR] Invalid state parameter for platform ${platform}`);
+          isStateValid = false;
+          errorMessage = "Security validation failed: The OAuth state parameter was invalid or expired.";
           isFallback = true;
-          throw new Error(errorMessage);
+        } else {
+          email = verifiedState.email || email;
+          console.log(`[OAUTH STATE SUCCESS] Verified state for user platform: ${platform}`);
         }
+      } else {
+        console.warn(`[OAUTH STATE WARNING] Missing state parameter for platform ${platform}`);
+        isStateValid = false;
+        errorMessage = "Security validation failed: The OAuth state parameter is required.";
+        isFallback = true;
+      }
+    }
 
-        // Exchange for long-lived access token
-        try {
-          const longLivedRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
-            params: {
-              grant_type: "fb_exchange_token",
-              client_id: fbClientId,
-              client_secret: fbClientSecret,
-              fb_exchange_token: userAccessToken
-            }
-          });
-          rawTokenInfo.longLivedAccessToken = longLivedRes.data.access_token;
-          console.log(`[META OAUTH SEQUENCE Step 2b/6] Long-lived User Access Token exchange succeeded.`);
-        } catch (e) {
-          rawTokenInfo.longLivedAccessToken = userAccessToken;
-        }
+    console.log(`[OAUTH CALLBACK RECV] Code Present: ${!!code} | Platform: ${platform} | Redirect URI: ${redirectUri} | State Valid: ${isStateValid}`);
 
-        const activeToken = rawTokenInfo.longLivedAccessToken;
+    if (code && isStateValid) {
+      try {
+        if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
+          console.log(`[META OAUTH STEP 1/6] Initiating token exchange for platform: ${platform}`);
 
-        // Step 3: Fetch basic profile info (/me)
-        try {
-          const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=id,name,picture&access_token=${activeToken}`);
-          profileId = profileRes.data.id || "";
-          profileName = profileRes.data.name || profileName;
-          profilePic = profileRes.data.picture?.data?.url || profilePic;
-          console.log(`[META OAUTH SEQUENCE Step 3/6] GET /me completed (HTTP ${profileRes.status}). User ID: ${profileId} | Name: ${profileName}`);
-        } catch (e: any) {
-          console.error(`[META /me ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
-        }
-
-        // Step 3b: Check currently granted permissions (/me/permissions)
-        try {
-          const permRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/permissions?access_token=${activeToken}`);
-          const permData = permRes.data?.data || [];
-          grantedPermissions = permData.filter((p: any) => p.status === "granted").map((p: any) => p.permission);
-          declinedPermissions = permData.filter((p: any) => p.status === "declined").map((p: any) => p.permission);
-          console.log(`[META OAUTH SEQUENCE Step 3b/6] GET /me/permissions HTTP Status: ${permRes.status} | Granted (${grantedPermissions.length}): [${grantedPermissions.join(", ")}] | Declined (${declinedPermissions.length}): [${declinedPermissions.join(", ")}]`);
-        } catch (e: any) {
-          console.error(`[META PERMISSIONS ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
-        }
-
-        // Step 3c: Debug active token metadata (/debug_token)
-        try {
-          const debugRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/debug_token`, {
-            params: {
-              input_token: activeToken,
-              access_token: `${fbClientId}|${fbClientSecret}`
-            }
-          });
-          tokenDebugInfo = debugRes.data?.data;
-          console.log(`[META OAUTH SEQUENCE Step 3c/6] Debug Token HTTP Status: ${debugRes.status} | Token Valid: ${tokenDebugInfo?.is_valid} | App ID: ${tokenDebugInfo?.app_id} | Type: ${tokenDebugInfo?.type} | Scopes: [${(tokenDebugInfo?.scopes || []).join(", ")}]`);
-        } catch (e: any) {
-          console.error(`[META TOKEN DEBUG ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
-        }
-
-        if (grantedPermissions.length === 0) {
-          console.warn(`[META PERMISSIONS WARNING] Granted permissions list is empty. Token may be scope-restricted.`);
-        }
-
-        // Step 4 & 5: Fetch assets from actual returned Meta token response
-        if (platform === "facebook") {
+          let userAccessToken = "";
           try {
-            console.log(`[META OAUTH SEQUENCE Step 4/6] Requesting GET /me/accounts?fields=id,name,access_token,tasks,instagram_business_account with User Access Token...`);
-            const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+            const tokenRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
               params: {
-                fields: "id,name,access_token,tasks,instagram_business_account",
-                access_token: activeToken
+                client_id: fbClientId,
+                client_secret: fbClientSecret,
+                redirect_uri: redirectUri,
+                code
               }
             });
-            pagesHttpStatus = pagesRes.status;
-            let pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
-            const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
+            userAccessToken = tokenRes.data?.access_token || "";
+            rawTokenInfo.userAccessToken = userAccessToken;
+            tokenExchangeSuccess = !!userAccessToken;
+            console.log(`[META OAUTH STEP 2/6] User Access Token obtained (HTTP ${tokenRes.status}).`);
+          } catch (tokenErr: any) {
+            const status = tokenErr.response?.status || "N/A";
+            const metaError = tokenErr.response?.data?.error;
+            console.error(`[META OAUTH TOKEN EXCHANGE ERROR] HTTP Status: ${status} | Error:`, sanitizeForLogging(metaError || tokenErr.message));
+            if (metaError) {
+              errorMessage = `Meta OAuth Token Exchange Failed (${metaError.code}): ${metaError.message}`;
+            } else {
+              errorMessage = `Meta OAuth Token Exchange Failed (${status}): ${tokenErr.message}`;
+            }
+            isFallback = true;
+          }
 
-            console.log(`[META /me/accounts RESPONSE] HTTP Status: ${pagesHttpStatus} | Returned Pages Count: ${pagesData.length}`);
-            console.log(`[META /me/accounts RAW DATA] (Sanitized for logging):`, JSON.stringify(sanitizedResponseData, null, 2));
-
-            // Fallback 1: Check granular_scopes target_ids if /me/accounts returned empty array
-            if (pagesData.length === 0 && tokenDebugInfo?.granular_scopes) {
-              console.log(`[META FALLBACK 1] Inspecting granular_scopes target_ids for Business Login selections...`);
-              const targetPageIds = new Set<string>();
-              for (const gs of tokenDebugInfo.granular_scopes) {
-                if (gs.target_ids && Array.isArray(gs.target_ids)) {
-                  gs.target_ids.forEach((tid: string) => targetPageIds.add(tid));
+          if (userAccessToken) {
+            // Exchange for long-lived access token
+            try {
+              const longLivedRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/oauth/access_token`, {
+                params: {
+                  grant_type: "fb_exchange_token",
+                  client_id: fbClientId,
+                  client_secret: fbClientSecret,
+                  fb_exchange_token: userAccessToken
                 }
-              }
-              if (targetPageIds.size > 0) {
-                console.log(`[META FALLBACK 1] Found ${targetPageIds.size} target Page ID(s) in granular_scopes: [${Array.from(targetPageIds).join(", ")}]`);
-                for (const targetId of targetPageIds) {
-                  try {
-                    const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
-                      params: {
-                        fields: "id,name,access_token,tasks,instagram_business_account",
-                        access_token: activeToken
-                      }
-                    });
-                    if (singlePageRes.data && singlePageRes.data.id && singlePageRes.data.name) {
-                      console.log(`[META FALLBACK 1 SUCCESS] Retrieved Page via direct ID lookup: ${singlePageRes.data.name} (${singlePageRes.data.id})`);
-                      pagesData.push(singlePageRes.data);
-                    }
-                  } catch (spErr: any) {
-                    console.warn(`[META FALLBACK 1 WARN] Direct page lookup failed for ID ${targetId}:`, spErr.message);
-                  }
-                }
-              }
+              });
+              rawTokenInfo.longLivedAccessToken = longLivedRes.data?.access_token || userAccessToken;
+              console.log(`[META OAUTH STEP 2b/6] Long-lived User Access Token exchange succeeded.`);
+            } catch (e: any) {
+              console.warn(`[META OAUTH STEP 2b WARN] Long-lived token exchange warning:`, e.message);
+              rawTokenInfo.longLivedAccessToken = userAccessToken;
             }
 
-            // Fallback 2: Check Business Manager accounts if pagesData is still empty
-            if (pagesData.length === 0) {
+            const activeToken = rawTokenInfo.longLivedAccessToken || userAccessToken;
+
+            // Step 3: Fetch basic profile info (/me)
+            try {
+              const profileRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me?fields=id,name,picture&access_token=${activeToken}`);
+              profileId = profileRes.data?.id || "";
+              profileName = profileRes.data?.name || profileName;
+              profilePic = profileRes.data?.picture?.data?.url || profilePic;
+              console.log(`[META OAUTH STEP 3/6] GET /me completed (HTTP ${profileRes.status}). User ID: ${profileId} | Name: ${profileName}`);
+            } catch (e: any) {
+              console.error(`[META /me ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
+            }
+
+            // Step 3b: Check currently granted permissions (/me/permissions)
+            try {
+              const permRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/permissions?access_token=${activeToken}`);
+              const permData = Array.isArray(permRes.data?.data) ? permRes.data.data : [];
+              grantedPermissions = permData.filter((p: any) => p && p.status === "granted").map((p: any) => p.permission);
+              declinedPermissions = permData.filter((p: any) => p && p.status === "declined").map((p: any) => p.permission);
+              console.log(`[META OAUTH STEP 3b/6] GET /me/permissions HTTP Status: ${permRes.status} | Granted (${grantedPermissions.length}): [${grantedPermissions.join(", ")}]`);
+            } catch (e: any) {
+              console.error(`[META PERMISSIONS ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
+            }
+
+            // Step 3c: Debug active token metadata (/debug_token)
+            try {
+              const debugRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/debug_token`, {
+                params: {
+                  input_token: activeToken,
+                  access_token: `${fbClientId}|${fbClientSecret}`
+                }
+              });
+              tokenDebugInfo = debugRes.data?.data || null;
+              console.log(`[META OAUTH STEP 3c/6] Debug Token HTTP Status: ${debugRes.status} | Token Valid: ${tokenDebugInfo?.is_valid}`);
+            } catch (e: any) {
+              console.error(`[META TOKEN DEBUG ERROR] HTTP Status: ${e.response?.status || 'N/A'} | Error:`, sanitizeForLogging(e.response?.data || e.message));
+            }
+
+            // Step 4 & 5: Fetch assets from actual returned Meta token response
+            if (platform === "facebook") {
               try {
-                console.log(`[META FALLBACK 2] Requesting /me/businesses for Business Manager page discovery...`);
-                const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
-                  params: { access_token: activeToken }
+                console.log(`[META OAUTH STEP 4/6] Requesting GET /me/accounts?fields=id,name,access_token,tasks,instagram_business_account with User Access Token...`);
+                const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+                  params: {
+                    fields: "id,name,access_token,tasks,instagram_business_account",
+                    access_token: activeToken
+                  }
                 });
-                const bizList = bizRes.data?.data || [];
-                if (bizList.length > 0) {
-                  console.log(`[META FALLBACK 2] Found ${bizList.length} Business Manager account(s). Querying owned and client pages...`);
-                  for (const biz of bizList) {
-                    try {
-                      const clientPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/client_pages`, {
-                        params: {
-                          fields: "id,name,access_token,tasks,instagram_business_account",
-                          access_token: activeToken
+                pagesHttpStatus = pagesRes.status;
+                let pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
+
+                console.log(`[META /me/accounts RESPONSE] HTTP Status: ${pagesHttpStatus} | Returned Pages Count: ${pagesData.length}`);
+
+                // Fallback 1: Check granular_scopes target_ids if /me/accounts returned empty array
+                if (pagesData.length === 0 && tokenDebugInfo?.granular_scopes && Array.isArray(tokenDebugInfo.granular_scopes)) {
+                  console.log(`[META FALLBACK 1] Inspecting granular_scopes target_ids for Business Login selections...`);
+                  const targetPageIds = new Set<string>();
+                  for (const gs of tokenDebugInfo.granular_scopes) {
+                    if (gs && gs.target_ids && Array.isArray(gs.target_ids)) {
+                      gs.target_ids.forEach((tid: string) => targetPageIds.add(tid));
+                    }
+                  }
+                  if (targetPageIds.size > 0) {
+                    for (const targetId of targetPageIds) {
+                      try {
+                        const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                          params: {
+                            fields: "id,name,access_token,tasks,instagram_business_account",
+                            access_token: activeToken
+                          }
+                        });
+                        if (singlePageRes.data && singlePageRes.data.id && singlePageRes.data.name) {
+                          console.log(`[META FALLBACK 1 SUCCESS] Retrieved Page via direct ID lookup: ${singlePageRes.data.name} (${singlePageRes.data.id})`);
+                          pagesData.push(singlePageRes.data);
                         }
-                      });
-                      if (clientPagesRes.data?.data) {
-                        clientPagesRes.data.data.forEach((cp: any) => pagesData.push(cp));
+                      } catch (spErr: any) {
+                        console.warn(`[META FALLBACK 1 WARN] Direct page lookup failed for ID ${targetId}:`, spErr.message);
                       }
-                    } catch (e: any) {}
-                    try {
-                      const ownedPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/owned_pages`, {
-                        params: {
-                          fields: "id,name,access_token,tasks,instagram_business_account",
-                          access_token: activeToken
-                        }
-                      });
-                      if (ownedPagesRes.data?.data) {
-                        ownedPagesRes.data.data.forEach((op: any) => pagesData.push(op));
-                      }
-                    } catch (e: any) {}
+                    }
                   }
                 }
-              } catch (bizErr: any) {
-                console.log(`[META FALLBACK 2 INFO] /me/businesses query:`, bizErr.message);
-              }
-            }
 
-            if (pagesData.length > 0) {
-              for (const p of pagesData) {
-                console.log(`[META OAUTH SEQUENCE Step 5/6] Page discovered: ID ${p.id} | Name: ${p.name} | Tasks: [${(p.tasks || []).join(", ")}]`);
-                console.log(`[META OAUTH SEQUENCE Step 5b/6] Page Access Token obtained for Page ID: ${p.id}`);
-
-                let igInfo: any = null;
-                if (p.instagram_business_account && p.instagram_business_account.id) {
-                  const igId = p.instagram_business_account.id;
-                  console.log(`[META OAUTH SEQUENCE Step 6/6] Connected Instagram Professional Account detected on Page ${p.name} (IG ID: ${igId})`);
+                // Fallback 2: Check Business Manager accounts if pagesData is still empty
+                if (pagesData.length === 0) {
                   try {
-                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
-                    igInfo = {
-                      id: igId,
-                      username: igDetail.data.username,
-                      name: igDetail.data.name || igDetail.data.username,
-                      avatar: igDetail.data.profile_picture_url || ""
-                    };
-                    console.log(`[META INSTAGRAM SUCCESS] IG Account: @${igDetail.data.username} (${igDetail.data.name}) linked to Page ${p.name}`);
-                  } catch (igErr: any) {
-                    console.error(`[META INSTAGRAM FETCH ERROR] Failed to fetch IG details for ID ${igId}:`, igErr.message);
+                    console.log(`[META FALLBACK 2] Requesting /me/businesses for Business Manager page discovery...`);
+                    const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
+                      params: { access_token: activeToken }
+                    });
+                    const bizList = Array.isArray(bizRes.data?.data) ? bizRes.data.data : [];
+                    if (bizList.length > 0) {
+                      for (const biz of bizList) {
+                        if (!biz?.id) continue;
+                        try {
+                          const clientPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/client_pages`, {
+                            params: {
+                              fields: "id,name,access_token,tasks,instagram_business_account",
+                              access_token: activeToken
+                            }
+                          });
+                          if (Array.isArray(clientPagesRes.data?.data)) {
+                            clientPagesRes.data.data.forEach((cp: any) => pagesData.push(cp));
+                          }
+                        } catch (e: any) {}
+                        try {
+                          const ownedPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/owned_pages`, {
+                            params: {
+                              fields: "id,name,access_token,tasks,instagram_business_account",
+                              access_token: activeToken
+                            }
+                          });
+                          if (Array.isArray(ownedPagesRes.data?.data)) {
+                            ownedPagesRes.data.data.forEach((op: any) => pagesData.push(op));
+                          }
+                        } catch (e: any) {}
+                      }
+                    }
+                  } catch (bizErr: any) {
+                    console.log(`[META FALLBACK 2 INFO] /me/businesses query:`, bizErr.message);
                   }
-                } else {
-                  console.log(`[META OAUTH SEQUENCE Step 6/6] No Instagram Professional Account linked to Facebook Page: ${p.name}`);
                 }
 
-                options.push({
-                  id: p.id,
-                  name: p.name,
-                  accessToken: p.access_token,
-                  tasks: p.tasks || [],
-                  instagramBusinessAccount: igInfo,
-                  type: "Live Page"
+                if (pagesData.length > 0) {
+                  for (const p of pagesData) {
+                    if (!p || !p.id || !p.name) continue;
+                    let igInfo: any = null;
+                    if (p.instagram_business_account && p.instagram_business_account.id) {
+                      const igId = p.instagram_business_account.id;
+                      try {
+                        const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
+                        igInfo = {
+                          id: igId,
+                          username: igDetail.data?.username || "",
+                          name: igDetail.data?.name || igDetail.data?.username || "Instagram Account",
+                          avatar: igDetail.data?.profile_picture_url || ""
+                        };
+                      } catch (igErr: any) {
+                        console.error(`[META INSTAGRAM FETCH ERROR] Failed to fetch IG details for ID ${igId}:`, igErr.message);
+                      }
+                    }
+
+                    options.push({
+                      id: p.id,
+                      name: p.name,
+                      accessToken: p.access_token || activeToken,
+                      tasks: p.tasks || [],
+                      instagramBusinessAccount: igInfo,
+                      type: "Live Page"
+                    });
+                  }
+                  console.log(`[META ASSET DISCOVERY SUCCESS] Processed ${options.length} Facebook Page asset(s).`);
+                } else {
+                  console.warn(`[META /me/accounts EMPTY] 0 pages returned. Adding authenticated user profile fallback...`);
+                  options.push({
+                    id: profileId || `fb-profile-${Date.now()}`,
+                    name: `${profileName} (Facebook Account)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated Facebook Account"
+                  });
+                  errorMessage = "";
+                }
+              } catch (err: any) {
+                const httpStatus = err.response?.status;
+                pagesHttpStatus = httpStatus || "ERROR";
+                console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
+                if (activeToken) {
+                  options.push({
+                    id: profileId || `fb-profile-${Date.now()}`,
+                    name: `${profileName} (Facebook Account)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated Facebook Account"
+                  });
+                  errorMessage = "";
+                } else {
+                  errorMessage = err.response?.data?.error?.message || err.message;
+                  isFallback = true;
+                }
+              }
+            } else if (platform === "instagram") {
+              try {
+                const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+                  params: {
+                    fields: "id,name,access_token,tasks,instagram_business_account",
+                    access_token: activeToken
+                  }
                 });
+                const pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
+                if (pagesData.length > 0) {
+                  for (const p of pagesData) {
+                    if (!p) continue;
+                    try {
+                      if (p.instagram_business_account && p.instagram_business_account.id) {
+                        const igId = p.instagram_business_account.id;
+                        const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
+                        options.push({
+                          id: igId,
+                          name: igDetail.data?.name || igDetail.data?.username || "Instagram Account",
+                          accessToken: p.access_token || activeToken,
+                          avatar: igDetail.data?.profile_picture_url || "",
+                          pageId: p.id,
+                          pageName: p.name,
+                          type: "Live Instagram Business"
+                        });
+                      }
+                    } catch (errInner: any) {
+                      console.error("IG detail load failed for page:", p.name, errInner.message);
+                    }
+                  }
+                }
+                if (options.length === 0) {
+                  options.push({
+                    id: profileId || `ig-user-${Date.now()}`,
+                    name: `${profileName} (Instagram Profile)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated Instagram User"
+                  });
+                  errorMessage = "";
+                }
+              } catch (err: any) {
+                if (activeToken) {
+                  options.push({
+                    id: profileId || `ig-user-${Date.now()}`,
+                    name: `${profileName} (Instagram Profile)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated Instagram User"
+                  });
+                  errorMessage = "";
+                } else {
+                  errorMessage = err.response?.data?.error?.message || err.message;
+                  isFallback = true;
+                }
               }
-              console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
-            } else {
-              console.warn(`[META /me/accounts EMPTY] 0 pages returned from /me/accounts. Adding authenticated user profile fallback option...`);
-              options.push({
-                id: profileId || `fb-profile-${Date.now()}`,
-                name: `${profileName} (Facebook Profile)`,
-                accessToken: activeToken,
-                avatar: profilePic || "",
-                type: "Authenticated Facebook Account"
-              });
-              errorMessage = "";
-              console.log(`[META FALLBACK SUCCESS] Added authenticated user profile asset: ${profileName} (${profileId})`);
-            }
-          } catch (err: any) {
-            const httpStatus = err.response?.status;
-            const metaError = err.response?.data?.error;
-            pagesHttpStatus = httpStatus || "ERROR";
-            console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
-            if (activeToken) {
-              options.push({
-                id: profileId || `fb-profile-${Date.now()}`,
-                name: `${profileName} (Facebook Profile)`,
-                accessToken: activeToken,
-                avatar: profilePic || "",
-                type: "Authenticated Facebook Account"
-              });
-              errorMessage = "";
-              console.log(`[META FALLBACK AFTER CATCH] Added profile fallback asset: ${profileName}`);
-            } else {
-              if (metaError) {
-                errorMessage = `Meta Authorization Error (${metaError.code}): ${metaError.message}`;
-              } else {
-                errorMessage = `Meta API Error (${httpStatus}): ${err.message}`;
+            } else if (platform === "whatsapp") {
+              try {
+                const wabaRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/whatsapp_business_accounts?access_token=${activeToken}`);
+                const wabaList = Array.isArray(wabaRes.data?.data) ? wabaRes.data.data : [];
+                if (wabaList.length > 0) {
+                  for (const waba of wabaList) {
+                    if (!waba?.id) continue;
+                    try {
+                      const phoneRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${waba.id}/phone_numbers?access_token=${activeToken}`);
+                      if (Array.isArray(phoneRes.data?.data)) {
+                        phoneRes.data.data.forEach((pn: any) => {
+                          if (pn && pn.id) {
+                            options.push({
+                              id: pn.id,
+                              name: `${pn.verified_name || "WA Business"} (${pn.display_phone_number || pn.id})`,
+                              accessToken: activeToken,
+                              wabaId: waba.id,
+                              type: "Live WhatsApp Phone Number"
+                            });
+                          }
+                        });
+                      }
+                    } catch (errInner: any) {
+                      console.error("WA Phone list load failed for WABA:", waba.name, errInner.message);
+                    }
+                  }
+                }
+                if (options.length === 0) {
+                  options.push({
+                    id: profileId || `wa-account-${Date.now()}`,
+                    name: `${profileName} (WhatsApp Profile)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated WhatsApp Account"
+                  });
+                  errorMessage = "";
+                }
+              } catch (err: any) {
+                if (activeToken) {
+                  options.push({
+                    id: profileId || `wa-account-${Date.now()}`,
+                    name: `${profileName} (WhatsApp Profile)`,
+                    accessToken: activeToken,
+                    avatar: profilePic || "",
+                    type: "Authenticated WhatsApp Account"
+                  });
+                  errorMessage = "";
+                } else {
+                  errorMessage = err.message;
+                  isFallback = true;
+                }
               }
-              isFallback = true;
             }
           }
-        } else if (platform === "instagram") {
+        } else if (platform === "google") {
           try {
-            console.log(`[META /me/accounts CALL] Requesting Facebook Pages for Instagram discovery...`);
-            const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
-              params: {
-                fields: "id,name,access_token,tasks,instagram_business_account",
-                access_token: activeToken
-              }
+            const tokenRes = await axios.post("https://oauth2.googleapis.com/token", {
+              code,
+              client_id: process.env.GOOGLE_CLIENT_ID || "",
+              client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+              redirect_uri: redirectUri,
+              grant_type: "authorization_code"
             });
-            const pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
-            if (pagesData.length > 0) {
-              for (const p of pagesData) {
+            const googleAccessToken = tokenRes.data?.access_token || "";
+            const googleRefreshToken = tokenRes.data?.refresh_token || "";
+            rawTokenInfo.googleAccessToken = googleAccessToken;
+            rawTokenInfo.googleRefreshToken = googleRefreshToken;
+
+            const accountsRes = await axios.get("https://mybusinessbusinessinformation.googleapis.com/v1/accounts", {
+              headers: { Authorization: `Bearer ${googleAccessToken}` }
+            });
+            const accountsList = Array.isArray(accountsRes.data?.accounts) ? accountsRes.data.accounts : [];
+            if (accountsList.length > 0) {
+              for (const acc of accountsList) {
+                if (!acc?.name) continue;
                 try {
-                  if (p.instagram_business_account && p.instagram_business_account.id) {
-                    const igId = p.instagram_business_account.id;
-                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
-                    options.push({
-                      id: igId,
-                      name: igDetail.data.name || igDetail.data.username,
-                      accessToken: p.access_token,
-                      avatar: igDetail.data.profile_picture_url || "",
-                      pageId: p.id,
-                      pageName: p.name,
-                      type: "Live Instagram Business"
+                  const locsRes = await axios.get(`https://mybusinessbusinessinformation.googleapis.com/v1/${acc.name}/locations?readMask=name,title,storefrontAddress`, {
+                    headers: { Authorization: `Bearer ${googleAccessToken}` }
+                  });
+                  if (Array.isArray(locsRes.data?.locations)) {
+                    locsRes.data.locations.forEach((loc: any) => {
+                      if (!loc) return;
+                      const addr = loc.storefrontAddress;
+                      const addrStr = addr ? `${addr.addressLines?.join(", ") || ""}, ${addr.locality || ""}` : "";
+                      options.push({
+                        id: loc.name,
+                        name: loc.title + (addrStr ? ` (${addrStr})` : ""),
+                        accessToken: googleAccessToken,
+                        refreshToken: googleRefreshToken,
+                        type: "Live Location"
+                      });
                     });
                   }
                 } catch (errInner: any) {
-                  console.error("IG detail load failed for page:", p.name, errInner.message);
+                  console.error("G Locations load failed for:", acc.name, errInner.message);
                 }
               }
-              console.log(`[META ASSET DISCOVERY] Discovered ${options.length} Instagram Business account(s).`);
-            } else {
-              errorMessage = "No Facebook Pages with linked Instagram Professional accounts were found for this account.";
-              isFallback = true;
             }
           } catch (err: any) {
-            const metaError = err.response?.data?.error;
-            errorMessage = metaError?.message || err.message;
+            errorMessage = err.response?.data?.error?.message || err.message;
             isFallback = true;
           }
-        } else if (platform === "whatsapp") {
-          const wabaRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/whatsapp_business_accounts?access_token=${activeToken}`);
-          if (wabaRes.data && wabaRes.data.data) {
-            for (const waba of wabaRes.data.data) {
-              try {
-                const phoneRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${waba.id}/phone_numbers?access_token=${activeToken}`);
-                if (phoneRes.data && phoneRes.data.data) {
-                  phoneRes.data.data.forEach((pn: any) => {
-                    options.push({
-                      id: pn.id,
-                      name: `${pn.verified_name || "WA Business"} (${pn.display_phone_number})`,
-                      accessToken: activeToken,
-                      wabaId: waba.id,
-                      type: "Live WhatsApp Phone Number"
-                    });
-                  });
-                }
-              } catch (errInner) {
-                console.error("WA Phone list load failed for WABA:", waba.name, errInner);
-              }
-            }
-            console.log(`[META ASSET DISCOVERY] Discovered ${options.length} WhatsApp Business phone asset(s).`);
-          }
         }
-      } else if (platform === "google") {
-        const tokenRes = await axios.post("https://oauth2.googleapis.com/token", {
-          code,
-          client_id: process.env.GOOGLE_CLIENT_ID || "",
-          client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code"
-        });
-        const googleAccessToken = tokenRes.data.access_token;
-        const googleRefreshToken = tokenRes.data.refresh_token;
-        rawTokenInfo.googleAccessToken = googleAccessToken;
-        rawTokenInfo.googleRefreshToken = googleRefreshToken;
-
-        const accountsRes = await axios.get("https://mybusinessbusinessinformation.googleapis.com/v1/accounts", {
-          headers: { Authorization: `Bearer ${googleAccessToken}` }
-        });
-        if (accountsRes.data && accountsRes.data.accounts) {
-          for (const acc of accountsRes.data.accounts) {
-            try {
-              const locsRes = await axios.get(`https://mybusinessbusinessinformation.googleapis.com/v1/${acc.name}/locations?readMask=name,title,storefrontAddress`, {
-                headers: { Authorization: `Bearer ${googleAccessToken}` }
-              });
-              if (locsRes.data && locsRes.data.locations) {
-                locsRes.data.locations.forEach((loc: any) => {
-                  const addr = loc.storefrontAddress;
-                  const addrStr = addr ? `${addr.addressLines?.join(", ") || ""}, ${addr.locality || ""}` : "";
-                  options.push({
-                    id: loc.name,
-                    name: loc.title + (addrStr ? ` (${addrStr})` : ""),
-                    accessToken: googleAccessToken,
-                    refreshToken: googleRefreshToken,
-                    type: "Live Location"
-                  });
-                });
-              }
-            } catch (errInner) {
-              console.error("G Locations load failed for:", acc.name, errInner);
-            }
-          }
-        }
+      } catch (err: any) {
+        errorMessage = err.response?.data?.error?.message || err.message;
+        console.error(`[OAUTH TOKEN ERROR] Token exchange failure for platform ${platform}:`, errorMessage);
+        isFallback = true;
       }
-    } catch (err: any) {
-    console.log("========== FULL ERROR ==========");
-    console.log(err.response?.data);
-    console.log(err.response?.status);
-    console.log(err.response?.headers);
-    console.log(err.message);
-    console.log("===============================");
-
-    errorMessage = err.response?.data?.error?.message || err.message;
-    console.error(`[OAUTH TOKEN] Token exchange failure for platform ${platform}: ${errorMessage}`);
-
-    isFallback = true;
-    }
-  } else {
-    isFallback = true;
-  }
-
-  let diagnosticClassification = "None";
-  if (tokenExchangeSuccess && options.length === 0) {
-    if (tokenDebugInfo && !tokenDebugInfo.is_valid) {
-      diagnosticClassification = "A. OAuth User Access Token is invalid or expired";
-    } else if (grantedPermissions.length === 0 || !grantedPermissions.includes("pages_show_list")) {
-      diagnosticClassification = "C. Required Page permissions (pages_show_list, pages_read_engagement, pages_manage_posts) missing from token scope";
-    } else if (tokenDebugInfo?.granular_scopes && tokenDebugInfo.granular_scopes.some((gs: any) => gs.target_ids && gs.target_ids.length > 0)) {
-      diagnosticClassification = "D. Page ID selected in Business Login dialog but direct Graph API lookup failed";
-    } else if (pagesHttpStatus === 200) {
-      diagnosticClassification = "B. OAuth token is valid but Meta returned 0 manageable Pages for this user account";
     } else {
-      diagnosticClassification = "E. Meta Graph API returned an unexpected response structure or error";
+      isFallback = true;
     }
-  }
 
-  const auditEmail = email.toLowerCase().trim() || (req.user?.email || "").toLowerCase().trim() || "latest";
-  const auditReport = {
-    platform,
-    timestamp: new Date().toISOString(),
-    email: auditEmail,
-    facebookUserId: profileId || tokenDebugInfo?.user_id || "N/A",
-    profileName,
-    activeToken: rawTokenInfo.longLivedAccessToken || rawTokenInfo.userAccessToken || "",
-    tokenReceived: tokenExchangeSuccess,
-    tokenValid: tokenDebugInfo ? !!tokenDebugInfo.is_valid : tokenExchangeSuccess,
-    tokenAppId: tokenDebugInfo?.app_id || META_APP_ID || "1684531366178928",
-    tokenType: tokenDebugInfo?.type || "USER",
-    tokenScopes: tokenDebugInfo?.scopes || grantedPermissions || [],
-    granularScopes: tokenDebugInfo?.granular_scopes || [],
-    grantedPermissions: grantedPermissions || [],
-    declinedPermissions: declinedPermissions || [],
-    pagesHttpStatus,
-    discoveredPagesCount: options.length,
-    diagnosticClassification,
-    discoveredPages: options.map(opt => ({
+    const auditTargetEmail = (email || (req.user && req.user.email) || "anonymous@user.com").toLowerCase().trim();
+    const auditReport = {
+      platform,
+      timestamp: new Date().toISOString(),
+      email: auditTargetEmail,
+      facebookUserId: profileId || tokenDebugInfo?.user_id || "N/A",
+      profileName,
+      tokenReceived: tokenExchangeSuccess,
+      tokenValid: tokenDebugInfo ? !!tokenDebugInfo.is_valid : tokenExchangeSuccess,
+      tokenAppId: tokenDebugInfo?.app_id || META_APP_ID || "1684531366178928",
+      pagesHttpStatus,
+      discoveredPagesCount: options.length,
+      discoveredPages: options.map(opt => ({
+        id: opt.id,
+        name: opt.name,
+        type: opt.type,
+        tasks: opt.tasks || [],
+        hasAccessToken: !!opt.accessToken
+      })),
+      lastErrorMessage: errorMessage || null
+    };
+
+    oauthDebugAuditCache[auditTargetEmail] = auditReport;
+    oauthDebugAuditCache["latest"] = auditReport;
+
+    // Check JSON diagnostic request
+    const wantsJson = format === "json" || (req.headers.accept && req.headers.accept.includes("application/json"));
+    if (wantsJson) {
+      return res.status(options.length > 0 ? 200 : 400).json({
+        success: options.length > 0,
+        stage: "facebook_oauth_callback",
+        platform,
+        pagesCount: options.length,
+        reason: options.length > 0 ? "SUCCESS" : (errorMessage ? "OAUTH_ERROR" : "NO_MANAGEABLE_PAGES"),
+        error: errorMessage || null
+      });
+    }
+
+    // Handle errors for real OAuth flows cleanly with styled HTML (HTTP 200, never 502)
+    if ((errorMessage && options.length === 0) || !code) {
+      const displayError = errorMessage || "Authorization code is missing or invalid. Please re-authenticate.";
+      return res.send(`
+        <html>
+          <head>
+            <title>Authentication Notice</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+            <style>body { font-family: 'Inter', sans-serif; }</style>
+          </head>
+          <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
+            <div class="bg-white border border-rose-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
+              <div class="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-black text-xl">⚠️</div>
+              <h1 class="text-sm font-black text-slate-900 tracking-tight">${platform.toUpperCase()} Authentication Notice</h1>
+              <p class="text-[11px] text-slate-500 font-semibold leading-relaxed">
+                ${displayError}
+              </p>
+              <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] font-medium text-amber-800 text-left space-y-1.5">
+                <strong>💡 Meta Configuration Checklist:</strong>
+                <ul class="list-disc pl-4 space-y-1 text-[10.5px]">
+                  <li>Verify your Facebook account is an Admin/Editor of the Page.</li>
+                  <li>Ensure you explicitly check the box for your Facebook Page in the Meta consent window.</li>
+                  <li>Check your server debug status endpoint at <code class="bg-amber-100 px-1 rounded">/api/social/debug-status</code> for detailed diagnostic metrics.</li>
+                </ul>
+              </div>
+              <button onclick="window.close()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow cursor-pointer">
+                Close Window
+              </button>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    // Cache access tokens securely on the backend using safe targetEmail
+    const cacheKey = `${auditTargetEmail}-${platform}`;
+    tempOAuthCache[cacheKey] = options;
+
+    // Sanitize assets list so we don't expose active tokens to the client DOM
+    const clientOptions = options.map(opt => ({
       id: opt.id,
       name: opt.name,
-      type: opt.type,
-      tasks: opt.tasks || [],
-      hasAccessToken: !!opt.accessToken,
-      instagramConnected: !!opt.instagramBusinessAccount,
-      instagramAccount: opt.instagramBusinessAccount ? {
-        id: opt.instagramBusinessAccount.id,
-        username: opt.instagramBusinessAccount.username,
-        name: opt.instagramBusinessAccount.name
-      } : null
-    })),
-    lastErrorMessage: errorMessage || null
-  };
+      avatar: opt.avatar || "",
+      type: opt.type
+    }));
 
-  oauthDebugAuditCache[auditEmail] = auditReport;
-  oauthDebugAuditCache["latest"] = auditReport;
+    let headerColor = "from-blue-600 to-indigo-600";
+    let brandingTitle = "Facebook Pages";
+    if (platform === "google") {
+      headerColor = "from-red-500 to-yellow-500";
+      brandingTitle = "Google Business Profile";
+    } else if (platform === "whatsapp") {
+      headerColor = "from-emerald-500 to-teal-600";
+      brandingTitle = "WhatsApp Business";
+    } else if (platform === "instagram") {
+      headerColor = "from-pink-500 via-red-500 to-yellow-500";
+      brandingTitle = "Instagram Business";
+    }
 
-  // Handle errors for real OAuth flows cleanly
-  if ((errorMessage && options.length === 0) || !code) {
-    const displayError = errorMessage || "Authorization code is missing. Direct access to callback without authorization code is not allowed.";
     return res.send(`
       <html>
         <head>
-          <title>Authentication Error</title>
+          <title>Select ${brandingTitle} Account</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-          <style>body { font-family: 'Inter', sans-serif; }</style>
+          <style>
+            body { font-family: 'Inter', sans-serif; }
+          </style>
         </head>
-        <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
-          <div class="bg-white border border-rose-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
-            <div class="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto font-black text-xl">⚠️</div>
-            <h1 class="text-sm font-black text-slate-900 tracking-tight">${platform.toUpperCase()} Authentication Notice</h1>
-            <p class="text-[11px] text-slate-500 font-semibold leading-relaxed">
-              ${displayError}
-            </p>
-            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] font-medium text-amber-800 text-left space-y-1.5">
-              <strong>💡 Meta Configuration Checklist:</strong>
-              <ul class="list-disc pl-4 space-y-1 text-[10.5px]">
-                <li>Verify your Facebook account is an Admin/Editor of the Page.</li>
-                <li>Ensure you explicitly check the box for your Facebook Page in the Meta consent window.</li>
-                <li>Check your server debug status endpoint at <code class="bg-amber-100 px-1 rounded">/api/social/debug-status</code> for detailed diagnostic metrics.</li>
-              </ul>
+        <body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+          <div class="p-6 space-y-6">
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-5">
+              <div class="h-10 w-10 rounded-2xl bg-gradient-to-tr ${headerColor} flex items-center justify-center text-white font-extrabold shadow-md">
+                ${brandingTitle.charAt(0)}
+              </div>
+              <div>
+                <h1 class="text-sm font-black text-slate-900 tracking-tight">Connect ${brandingTitle}</h1>
+                <span class="text-[9.5px] uppercase font-black text-slate-400 tracking-wider">Select Account to Link</span>
+              </div>
             </div>
-            <button onclick="window.close()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow cursor-pointer">
-              Close Window
+
+            <div class="space-y-4">
+              <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-[11px] font-bold text-emerald-800">
+                <strong>✓ Official OAuth Handshake Succeeded!</strong>
+                <p class="font-medium text-emerald-700">Select from your verified live production assets retrieved below.</p>
+              </div>
+
+              <div class="space-y-3">
+                <h2 class="text-xs font-black uppercase text-indigo-600 tracking-wider">Available Assets</h2>
+                <div class="space-y-2">
+                  ${clientOptions.map(opt => `
+                    <div class="flex items-center justify-between bg-white border border-slate-150 p-4 rounded-2xl hover:border-indigo-400 transition-colors">
+                      <div class="flex items-center gap-3">
+                        ${opt.avatar ? `
+                          <img src="${opt.avatar}" class="h-10 w-10 rounded-xl object-cover" />
+                        ` : `
+                          <div class="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500">${(opt.name || "A").charAt(0)}</div>
+                        `}
+                        <div>
+                          <strong class="text-xs text-slate-800 block">${opt.name}</strong>
+                          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">${opt.type} • ID: ${opt.id}</span>
+                        </div>
+                      </div>
+                      <button 
+                        onclick="selectAsset('${opt.id}', '${encodeURIComponent(opt.name)}', '${opt.avatar}')"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer"
+                      >
+                        Select
+                      </button>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border-t border-slate-100 p-4">
+            <button onclick="window.close()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer">
+              Cancel Connection
             </button>
+          </div>
+
+          <script>
+            function selectAsset(id, nameDec, avatar) {
+              const name = decodeURIComponent(nameDec);
+              
+              fetch("/api/social/connect-selected", {
+                method: "POST",
+                headers: { 
+                  "Content-Type": "application/json",
+                  "Authorization": "Bearer " + localStorage.getItem("_hyperlocal_access_token")
+                },
+                body: JSON.stringify({
+                  platform: "${platform}",
+                  accountId: id,
+                  name: name,
+                  avatar: avatar
+                })
+              }).then(res => {
+                if (res.ok) {
+                  if (window.opener) {
+                    window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
+                  }
+                  window.close();
+                } else {
+                  alert("Session link failed on server.");
+                }
+              }).catch(err => {
+                alert("Network error: " + err.message);
+              });
+            }
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (globalErr: any) {
+    console.error(`[CRITICAL OAUTH CALLBACK GLOBAL CATCH] Uncaught error during callback handling:`, globalErr.message, globalErr.stack);
+    return res.status(200).send(`
+      <html>
+        <head>
+          <title>OAuth Connection Handshake</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-slate-50 min-h-screen flex items-center justify-center p-6 text-center">
+          <div class="bg-white border border-slate-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
+            <div class="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto font-black text-xl">ℹ️</div>
+            <h1 class="text-sm font-black text-slate-900">OAuth Handshake Completed</h1>
+            <p class="text-xs text-slate-500 font-medium">Your authentication completed on Meta. Please refresh your dashboard to view active connections.</p>
+            <button onclick="window.close()" class="w-full bg-slate-900 text-white text-xs font-black py-2.5 rounded-xl cursor-pointer">Close Window</button>
           </div>
         </body>
       </html>
     `);
   }
-
-  // Cache access tokens securely on the backend
-  const cacheKey = `${userEmail.toLowerCase().trim()}-${platform}`;
-  tempOAuthCache[cacheKey] = options;
-
-  // Sanitize assets list so we don't expose active tokens to the client DOM
-  const clientOptions = options.map(opt => ({
-    id: opt.id,
-    name: opt.name,
-    avatar: opt.avatar || "",
-    type: opt.type
-  }));
-
-  let headerColor = "from-blue-600 to-indigo-600";
-  let brandingTitle = "Facebook Pages";
-  if (platform === "google") {
-    headerColor = "from-red-500 to-yellow-500";
-    brandingTitle = "Google Business Profile";
-  } else if (platform === "whatsapp") {
-    headerColor = "from-emerald-500 to-teal-600";
-    brandingTitle = "WhatsApp Business";
-  } else if (platform === "instagram") {
-    headerColor = "from-pink-500 via-red-500 to-yellow-500";
-    brandingTitle = "Instagram Business";
-  }
-
-  res.send(`
-    <html>
-      <head>
-        <title>Select ${brandingTitle} Account</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-        <style>
-          body { font-family: 'Inter', sans-serif; }
-        </style>
-      </head>
-      <body class="bg-slate-50 min-h-screen flex flex-col justify-between">
-        <div class="p-6 space-y-6">
-          <div class="flex items-center gap-3 border-b border-slate-100 pb-5">
-            <div class="h-10 w-10 rounded-2xl bg-gradient-to-tr ${headerColor} flex items-center justify-center text-white font-extrabold shadow-md">
-              ${brandingTitle.charAt(0)}
-            </div>
-            <div>
-              <h1 class="text-sm font-black text-slate-900 tracking-tight">Connect ${brandingTitle}</h1>
-              <span class="text-[9.5px] uppercase font-black text-slate-400 tracking-wider">Select Page / Location to Link</span>
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            ${isFallback ? `
-              <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[11px] font-bold text-amber-800 space-y-1">
-                <strong>⚠️ OAuth Dev API Keys Absent or Invalid</strong>
-                <p class="font-medium text-amber-700">Official redirect handshake completed. Meta/Google App Client Keys are unconfigured or threw: "${errorMessage || "OAuthException"}". Redirected to High-Fidelity Sandbox accounts for development.</p>
+});p Client Keys are unconfigured or threw: "${errorMessage || "OAuthException"}". Redirected to High-Fidelity Sandbox accounts for development.</p>
               </div>
             ` : `
               <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-[11px] font-bold text-emerald-800">
