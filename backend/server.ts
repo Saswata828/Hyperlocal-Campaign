@@ -4822,11 +4822,20 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   });
 });
 
-app.get("/api/social/debug-status", authGuard, (req: any, res) => {
-  const userEmail = (req.user?.email || "").toLowerCase().trim();
-  const dbUser = userSocialConnections[userEmail];
-  const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"] || {
-    status: "No OAuth attempts logged yet for this user session."
+app.get("/api/social/debug-status", (req: any, res) => {
+  let userEmail = "";
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded: any = jwt.verify(token, JWT_SECRET_KEY);
+      userEmail = (decoded.email || "").toLowerCase().trim();
+    } catch (e) {}
+  }
+
+  const dbUser = userEmail ? userSocialConnections[userEmail] : null;
+  const audit = (userEmail && oauthDebugAuditCache[userEmail]) || oauthDebugAuditCache["latest"] || {
+    status: "No OAuth attempts logged yet for this server session."
   };
 
   const isConnectedInDb = dbUser?.connections?.some((c: any) => c.platform === "facebook" && c.connected);
@@ -4834,7 +4843,8 @@ app.get("/api/social/debug-status", authGuard, (req: any, res) => {
 
   res.json({
     success: true,
-    userEmail,
+    serverTimestamp: new Date().toISOString(),
+    userEmail: userEmail || audit.email || "anonymous",
     audit: {
       appId: audit.tokenAppId || META_APP_ID || "1684531366178928",
       facebookUserId: audit.facebookUserId || "N/A",
@@ -5182,101 +5192,140 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         // Step 4 & 5: Fetch assets from actual returned Meta token response
         if (platform === "facebook") {
           try {
-            console.log(`[META OAUTH SEQUENCE Step 4/6] Requesting GET /me/accounts?fields=id,name,access_token,tasks,instagram_business_account with User Access Token...`);
-            const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
-              params: {
-                fields: "id,name,access_token,tasks,instagram_business_account",
-                access_token: activeToken
+            console.log(`[META OAUTH SEQUENCE Step 4/6] Requesting GET /me/accounts with User Access Token...`);
+            const discoveredMap = new Map<string, any>();
+
+            // STAGE 1: Standard User Pages (/me/accounts)
+            try {
+              const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
+                params: {
+                  fields: "id,name,access_token,tasks,category,instagram_business_account",
+                  access_token: activeToken
+                }
+              });
+              pagesHttpStatus = pagesRes.status;
+              if (Array.isArray(pagesRes.data?.data)) {
+                pagesRes.data.data.forEach((p: any) => {
+                  if (p.id && p.name && !discoveredMap.has(p.id)) {
+                    discoveredMap.set(p.id, p);
+                  }
+                });
               }
-            });
-            pagesHttpStatus = pagesRes.status;
-            let pagesData = Array.isArray(pagesRes.data?.data) ? pagesRes.data.data : [];
-            const sanitizedResponseData = sanitizeForLogging(pagesRes.data);
+              console.log(`[META DISCOVERY STAGE 1] Found ${discoveredMap.size} page(s) via /me/accounts (HTTP ${pagesHttpStatus}).`);
+            } catch (err: any) {
+              const metaError = err.response?.data?.error;
+              pagesHttpStatus = err.response?.status || "ERROR";
+              console.warn(`[META DISCOVERY STAGE 1 WARN] /me/accounts query failed (HTTP ${pagesHttpStatus}):`, sanitizeForLogging(metaError || err.message));
+            }
 
-            console.log(`[META /me/accounts RESPONSE] HTTP Status: ${pagesHttpStatus} | Returned Pages Count: ${pagesData.length}`);
-            console.log(`[META /me/accounts RAW DATA] (Sanitized for logging):`, JSON.stringify(sanitizedResponseData, null, 2));
-
-            // Fallback 1: Check granular_scopes target_ids if /me/accounts returned empty array
-            if (pagesData.length === 0 && tokenDebugInfo?.granular_scopes) {
-              console.log(`[META FALLBACK 1] Inspecting granular_scopes target_ids for Business Login selections...`);
-              const targetPageIds = new Set<string>();
+            // STAGE 2: Inspect granular_scopes target_ids from Business Login debug_token
+            if (tokenDebugInfo?.granular_scopes && Array.isArray(tokenDebugInfo.granular_scopes)) {
+              console.log(`[META DISCOVERY STAGE 2] Inspecting granular_scopes target_ids for Business Login selections...`);
+              const targetIds = new Set<string>();
               for (const gs of tokenDebugInfo.granular_scopes) {
                 if (gs.target_ids && Array.isArray(gs.target_ids)) {
-                  gs.target_ids.forEach((tid: string) => targetPageIds.add(tid));
+                  gs.target_ids.forEach((tid: string) => targetIds.add(tid));
                 }
               }
-              if (targetPageIds.size > 0) {
-                console.log(`[META FALLBACK 1] Found ${targetPageIds.size} target Page ID(s) in granular_scopes: [${Array.from(targetPageIds).join(", ")}]`);
-                for (const targetId of targetPageIds) {
-                  try {
-                    const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
-                      params: {
-                        fields: "id,name,access_token,tasks,instagram_business_account",
-                        access_token: activeToken
+
+              if (targetIds.size > 0) {
+                console.log(`[META DISCOVERY STAGE 2] Found ${targetIds.size} target ID(s) in granular_scopes: [${Array.from(targetIds).join(", ")}]`);
+                for (const targetId of targetIds) {
+                  if (!discoveredMap.has(targetId)) {
+                    try {
+                      const singlePageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                        params: {
+                          fields: "id,name,access_token,tasks,category,instagram_business_account",
+                          access_token: activeToken
+                        }
+                      });
+                      if (singlePageRes.data && singlePageRes.data.id && singlePageRes.data.name) {
+                        console.log(`[META DISCOVERY STAGE 2 SUCCESS] Direct Page lookup succeeded for targetId: ${singlePageRes.data.name} (${singlePageRes.data.id})`);
+                        discoveredMap.set(singlePageRes.data.id, singlePageRes.data);
                       }
-                    });
-                    if (singlePageRes.data && singlePageRes.data.id && singlePageRes.data.name) {
-                      console.log(`[META FALLBACK 1 SUCCESS] Retrieved Page via direct ID lookup: ${singlePageRes.data.name} (${singlePageRes.data.id})`);
-                      pagesData.push(singlePageRes.data);
+                    } catch (spErr: any) {
+                      const metaError = spErr.response?.data?.error;
+                      console.log(`[META DISCOVERY STAGE 2 INFO] Direct lookup for targetId ${targetId} returned error (Code ${metaError?.code || "N/A"}). Checking as Business Account ID...`);
+                      
+                      const bizEndpoints = ["owned_pages", "client_pages", "pages", "assigned_pages"];
+                      for (const ep of bizEndpoints) {
+                        try {
+                          const bpRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}/${ep}`, {
+                            params: {
+                              fields: "id,name,access_token,tasks,category,instagram_business_account",
+                              access_token: activeToken
+                            }
+                          });
+                          if (Array.isArray(bpRes.data?.data)) {
+                            bpRes.data.data.forEach((p: any) => {
+                              if (p.id && p.name && !discoveredMap.has(p.id)) {
+                                console.log(`[META DISCOVERY STAGE 2 BIZ SUCCESS] Discovered Page ${p.name} (${p.id}) under Business ${targetId} via /${ep}`);
+                                discoveredMap.set(p.id, p);
+                              }
+                            });
+                          }
+                        } catch (bizSubErr: any) {}
+                      }
                     }
-                  } catch (spErr: any) {
-                    console.warn(`[META FALLBACK 1 WARN] Direct page lookup failed for ID ${targetId}:`, spErr.message);
                   }
                 }
               }
             }
 
-            // Fallback 2: Check Business Manager accounts if pagesData is still empty
-            if (pagesData.length === 0) {
-              try {
-                console.log(`[META FALLBACK 2] Requesting /me/businesses for Business Manager page discovery...`);
-                const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
-                  params: { access_token: activeToken }
-                });
-                const bizList = bizRes.data?.data || [];
-                if (bizList.length > 0) {
-                  console.log(`[META FALLBACK 2] Found ${bizList.length} Business Manager account(s). Querying owned and client pages...`);
-                  for (const biz of bizList) {
+            // STAGE 3: Business Manager User Account Discovery (/me/businesses)
+            try {
+              console.log(`[META DISCOVERY STAGE 3] Querying /me/businesses for Business Manager account discovery...`);
+              const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
+                params: { access_token: activeToken }
+              });
+              const bizList = Array.isArray(bizRes.data?.data) ? bizRes.data.data : [];
+              if (bizList.length > 0) {
+                console.log(`[META DISCOVERY STAGE 3] Found ${bizList.length} Business Account(s). Querying pages...`);
+                for (const biz of bizList) {
+                  const bizEndpoints = ["owned_pages", "client_pages", "pages", "assigned_pages"];
+                  for (const ep of bizEndpoints) {
                     try {
-                      const clientPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/client_pages`, {
+                      const bpRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/${ep}`, {
                         params: {
-                          fields: "id,name,access_token,tasks,instagram_business_account",
+                          fields: "id,name,access_token,tasks,category,instagram_business_account",
                           access_token: activeToken
                         }
                       });
-                      if (clientPagesRes.data?.data) {
-                        clientPagesRes.data.data.forEach((cp: any) => pagesData.push(cp));
-                      }
-                    } catch (e: any) {}
-                    try {
-                      const ownedPagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/owned_pages`, {
-                        params: {
-                          fields: "id,name,access_token,tasks,instagram_business_account",
-                          access_token: activeToken
-                        }
-                      });
-                      if (ownedPagesRes.data?.data) {
-                        ownedPagesRes.data.data.forEach((op: any) => pagesData.push(op));
+                      if (Array.isArray(bpRes.data?.data)) {
+                        bpRes.data.data.forEach((p: any) => {
+                          if (p.id && p.name && !discoveredMap.has(p.id)) {
+                            console.log(`[META DISCOVERY STAGE 3 SUCCESS] Found Page ${p.name} (${p.id}) under Business ${biz.id} via /${ep}`);
+                            discoveredMap.set(p.id, p);
+                          }
+                        });
                       }
                     } catch (e: any) {}
                   }
                 }
-              } catch (bizErr: any) {
-                console.log(`[META FALLBACK 2 INFO] /me/businesses query:`, bizErr.message);
               }
+            } catch (bizErr: any) {
+              console.log(`[META DISCOVERY STAGE 3 INFO] /me/businesses query:`, bizErr.message);
             }
+
+            const pagesData = Array.from(discoveredMap.values());
 
             if (pagesData.length > 0) {
               for (const p of pagesData) {
                 console.log(`[META OAUTH SEQUENCE Step 5/6] Page discovered: ID ${p.id} | Name: ${p.name} | Tasks: [${(p.tasks || []).join(", ")}]`);
-                console.log(`[META OAUTH SEQUENCE Step 5b/6] Page Access Token obtained for Page ID: ${p.id}`);
 
+                let effectiveToken = p.access_token || activeToken;
+                
                 let igInfo: any = null;
                 if (p.instagram_business_account && p.instagram_business_account.id) {
                   const igId = p.instagram_business_account.id;
                   console.log(`[META OAUTH SEQUENCE Step 6/6] Connected Instagram Professional Account detected on Page ${p.name} (IG ID: ${igId})`);
                   try {
-                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}?fields=username,name,profile_picture_url&access_token=${p.access_token}`);
+                    const igDetail = await axios.get(`https://graph.facebook.com/${META_VERSION}/${igId}`, {
+                      params: {
+                        fields: "username,name,profile_picture_url",
+                        access_token: effectiveToken
+                      }
+                    });
                     igInfo = {
                       id: igId,
                       username: igDetail.data.username,
@@ -5285,7 +5334,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                     };
                     console.log(`[META INSTAGRAM SUCCESS] IG Account: @${igDetail.data.username} (${igDetail.data.name}) linked to Page ${p.name}`);
                   } catch (igErr: any) {
-                    console.error(`[META INSTAGRAM FETCH ERROR] Failed to fetch IG details for ID ${igId}:`, igErr.message);
+                    console.warn(`[META INSTAGRAM FETCH WARN] Failed to fetch IG details for ID ${igId}:`, igErr.message);
                   }
                 } else {
                   console.log(`[META OAUTH SEQUENCE Step 6/6] No Instagram Professional Account linked to Facebook Page: ${p.name}`);
@@ -5294,7 +5343,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 options.push({
                   id: p.id,
                   name: p.name,
-                  accessToken: p.access_token,
+                  accessToken: effectiveToken,
                   tasks: p.tasks || [],
                   instagramBusinessAccount: igInfo,
                   type: "Live Page"
@@ -5302,14 +5351,14 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               }
               console.log(`[META ASSET DISCOVERY SUCCESS] Successfully processed ${options.length} Facebook Page asset(s).`);
             } else {
-              console.warn(`[META /me/accounts EMPTY DIAGNOSTIC] CASE A: /me/accounts returned 0 pages after all discovery attempts.`);
+              console.warn(`[META PAGE DISCOVERY DIAGNOSTIC] 0 Facebook Pages returned after all discovery stages.`);
               const requiredPagePerms = ["pages_show_list", "pages_read_engagement", "pages_manage_posts"];
               const missingPerms = requiredPagePerms.filter(perm => !grantedPermissions.includes(perm));
 
               if (missingPerms.length > 0) {
                 console.warn(`[DIAGNOSTIC CAUSE]: Required Page permissions missing from token: [${missingPerms.join(", ")}]. Granted permissions were: [${grantedPermissions.join(", ")}].`);
               } else {
-                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages returned.`);
+                console.warn(`[DIAGNOSTIC CAUSE]: Permissions are granted [${grantedPermissions.join(", ")}], but 0 pages were returned by Meta Graph API.`);
               }
 
               errorMessage = "No Facebook Pages are available for this Facebook account. Make sure you are an administrator/task-enabled user of at least one Facebook Page and selected the Page during Meta authorization.";
@@ -5319,7 +5368,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             const httpStatus = err.response?.status;
             const metaError = err.response?.data?.error;
             pagesHttpStatus = httpStatus || "ERROR";
-            console.error(`[META /me/accounts ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
+            console.error(`[META PAGE DISCOVERY ERROR] HTTP Status: ${httpStatus || 'N/A'}`);
             if (metaError) {
               console.error(`[META ERROR DETAILS] Code: ${metaError.code} | Subcode: ${metaError.error_subcode || 'N/A'} | Type: ${metaError.type} | Message: ${metaError.message}`);
               errorMessage = `Meta Authorization Error (${metaError.code}): ${metaError.message}`;
