@@ -80,17 +80,12 @@ export const ConnectedAccounts: React.FC = () => {
     googleAccessToken: ''
   });
 
-  const fetchConnections = async (isRetry = false) => {
+  const fetchConnections = async () => {
     setLoading(true);
     try {
-      const response = await fetch(getApiUrl('/api/social/connections'), {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
+      const data = await apiService.getSocialConnections();
+      if (data && data.connections) {
+        setConnections(data.connections);
         if (data.credentials) {
           setDevConfig(prev => ({
             ...prev,
@@ -98,12 +93,6 @@ export const ConnectedAccounts: React.FC = () => {
           }));
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          showAlert('error', 'Session authentication expired or invalid. Please sign in again.');
-        } else {
-          showAlert('error', errData.message || `Backend returned status HTTP ${response.status}`);
-        }
         setConnections([
           { platform: 'facebook', connected: false },
           { platform: 'instagram', connected: false },
@@ -113,13 +102,7 @@ export const ConnectedAccounts: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Failed to load connections:", err);
-      if (!isRetry) {
-        console.log("[COLD START RETRY] Retrying connections fetch in 2s for backend wakeup...");
-        setTimeout(() => fetchConnections(true), 2000);
-        return;
-      }
-      showAlert('error', 'Unable to connect to backend server. Render service may be waking up from sleep mode.');
-      // Fallback local memory values if backend fails initially
+      showAlert('error', err.response?.data?.message || err.message || 'Unable to connect to social channels service.');
       setConnections([
         { platform: 'facebook', connected: false },
         { platform: 'instagram', connected: false },
