@@ -80,7 +80,7 @@ export const ConnectedAccounts: React.FC = () => {
     googleAccessToken: ''
   });
 
-  const fetchConnections = async () => {
+  const fetchConnections = async (isRetry = false) => {
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/api/social/connections'), {
@@ -97,9 +97,28 @@ export const ConnectedAccounts: React.FC = () => {
             ...data.credentials
           }));
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          showAlert('error', 'Session authentication expired or invalid. Please sign in again.');
+        } else {
+          showAlert('error', errData.message || `Backend returned status HTTP ${response.status}`);
+        }
+        setConnections([
+          { platform: 'facebook', connected: false },
+          { platform: 'instagram', connected: false },
+          { platform: 'whatsapp', connected: false },
+          { platform: 'google', connected: false }
+        ]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load connections:", err);
+      if (!isRetry) {
+        console.log("[COLD START RETRY] Retrying connections fetch in 2s for backend wakeup...");
+        setTimeout(() => fetchConnections(true), 2000);
+        return;
+      }
+      showAlert('error', 'Unable to connect to backend server. Render service may be waking up from sleep mode.');
       // Fallback local memory values if backend fails initially
       setConnections([
         { platform: 'facebook', connected: false },
