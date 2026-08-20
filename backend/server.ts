@@ -5231,6 +5231,27 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               console.warn(`[META DISCOVERY STAGE 1 WARN] /me/accounts query failed (HTTP ${pagesHttpStatus}):`, sanitizeForLogging(metaError || err.message));
             }
 
+            // STAGE 1b: User Business Assigned Pages (/me/assigned_pages)
+            try {
+              const assignedRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/assigned_pages`, {
+                params: {
+                  fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
+                  access_token: activeToken
+                }
+              });
+              if (Array.isArray(assignedRes.data?.data)) {
+                assignedRes.data.data.forEach((p: any) => {
+                  if (p.id && p.name && !discoveredMap.has(p.id)) {
+                    console.log(`[META DISCOVERY STAGE 1b SUCCESS] Found Page ${p.name} (${p.id}) via /me/assigned_pages`);
+                    discoveredMap.set(p.id, p);
+                  }
+                });
+              }
+              console.log(`[META DISCOVERY STAGE 1b] Found ${discoveredMap.size} total page(s) after /me/assigned_pages.`);
+            } catch (aErr: any) {
+              console.log(`[META DISCOVERY STAGE 1b INFO] /me/assigned_pages query:`, aErr.message);
+            }
+
             // STAGE 2: Inspect granular_scopes target_ids from Business Login debug_token
             if (tokenDebugInfo?.granular_scopes && Array.isArray(tokenDebugInfo.granular_scopes)) {
               console.log(`[META DISCOVERY STAGE 2] Inspecting granular_scopes target_ids for Business Login selections...`);
