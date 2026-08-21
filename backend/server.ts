@@ -4909,8 +4909,6 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
   let userRequest: any = { status: null, data: null, error: null };
   let accountsRequest: any = { status: null, data: null, error: null };
   let targetIdPageRequest: any = { status: null, targetId: "1340053172514256", isPageNode: false, data: null, error: null };
-  let assignedPagesRequest: any = { status: null, data: null, error: null };
-  let businessesRequest: any = { status: null, data: null, error: null };
 
   // 1. Query GET /me?fields=id,name
   try {
@@ -4926,11 +4924,11 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
     console.warn(`[META RAW DEBUG] GET /me - HTTP ${userRequest.status} - Error:`, JSON.stringify(userRequest.error));
   }
 
-  // 2. Query GET /me/accounts
+  // 2. Query GET /me/accounts (supported Page fields ONLY, no 'tasks')
   try {
     const accountsRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
       params: {
-        fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
+        fields: "id,name,access_token,category,picture{url},instagram_business_account",
         access_token: activeToken
       }
     });
@@ -4943,11 +4941,11 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
     console.warn(`[META RAW DEBUG] GET /me/accounts - HTTP ${accountsRequest.status} - Sanitized Response:`, JSON.stringify(accountsRequest.error));
   }
 
-  // 3. Query GET /1340053172514256 (Candidate Page Target ID)
+  // 3. Query GET /1340053172514256 (Candidate Page Target ID - supported fields ONLY)
   try {
     const targetRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/1340053172514256`, {
       params: {
-        fields: "id,name,category,tasks,access_token,instagram_business_account,picture{url}",
+        fields: "id,name,access_token,category,picture{url},instagram_business_account",
         access_token: activeToken
       }
     });
@@ -4961,58 +4959,18 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
     console.warn(`[META RAW DEBUG] GET /1340053172514256 - HTTP ${targetIdPageRequest.status} - Sanitized Response:`, JSON.stringify(targetIdPageRequest.error));
   }
 
-  // 4. Query GET /me/assigned_pages
-  try {
-    const assignedRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/assigned_pages`, {
-      params: {
-        fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
-        access_token: activeToken
-      }
-    });
-    assignedPagesRequest.status = assignedRes.status;
-    assignedPagesRequest.data = sanitizeForLogging(assignedRes.data);
-    console.log(`[META RAW DEBUG] GET /me/assigned_pages - HTTP ${assignedRes.status} - Sanitized Response:`, JSON.stringify(assignedPagesRequest.data));
-  } catch (err: any) {
-    assignedPagesRequest.status = err.response?.status || 500;
-    assignedPagesRequest.error = sanitizeForLogging(err.response?.data?.error || err.message);
-    console.warn(`[META RAW DEBUG] GET /me/assigned_pages - HTTP ${assignedPagesRequest.status} - Sanitized Response:`, JSON.stringify(assignedPagesRequest.error));
-  }
-
-  // 5. Query GET /me/businesses
-  try {
-    const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
-      params: { access_token: activeToken }
-    });
-    businessesRequest.status = bizRes.status;
-    businessesRequest.data = sanitizeForLogging(bizRes.data);
-    console.log(`[META RAW DEBUG] GET /me/businesses - HTTP ${bizRes.status} - Sanitized Response:`, JSON.stringify(businessesRequest.data));
-  } catch (err: any) {
-    businessesRequest.status = err.response?.status || 500;
-    businessesRequest.error = sanitizeForLogging(err.response?.data?.error || err.message);
-    console.warn(`[META RAW DEBUG] GET /me/businesses - HTTP ${businessesRequest.status} - Sanitized Response:`, JSON.stringify(businessesRequest.error));
-  }
-
   res.json({
     userRequest,
     accountsRequest,
-    targetIdPageRequest,
-    assignedPagesRequest,
-    businessesRequest
+    targetIdPageRequest
   });
 });
 
 app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
-  const pageId = (req.query.pageId || req.body?.pageId || "").toString().trim();
+  const pageId = (req.query.pageId || req.body?.pageId || "1340053172514256").toString().trim();
   const userEmail = (req.user?.email || "").toLowerCase().trim();
   const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"];
   const activeToken = audit?.activeToken || tempOAuthCache[`${userEmail}-facebook`]?.[0]?.accessToken;
-
-  if (!pageId) {
-    return res.status(400).json({
-      success: false,
-      error: "Page ID parameter is required. Usage: GET/POST /api/social/test-page-direct?pageId=YOUR_PAGE_ID"
-    });
-  }
 
   if (!activeToken) {
     return res.status(400).json({
@@ -5025,7 +4983,7 @@ app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
     console.log(`[PAGE DIRECT TEST] Testing Page ID: ${pageId} with User Access Token...`);
     const pageRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${pageId}`, {
       params: {
-        fields: "id,name,access_token,tasks,instagram_business_account,category",
+        fields: "id,name,access_token,category,picture{url},instagram_business_account",
         access_token: activeToken
       }
     });
@@ -5052,7 +5010,6 @@ app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
         name: pageRes.data.name,
         category: pageRes.data.category || "N/A",
         hasPageAccessToken: !!pageRes.data.access_token,
-        tasks: pageRes.data.tasks || [],
         instagramBusinessAccount: igDetails ? {
           id: igDetails.id,
           username: igDetails.username,
@@ -5230,18 +5187,18 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
           console.warn(`[META PERMISSIONS WARNING] Granted permissions list is empty. Token may be scope-restricted.`);
         }
 
-        // Step 4 & 5: Multi-Stage Page Asset Discovery
+        // Step 4 & 5: Page Asset Discovery
         if (platform === "facebook") {
           try {
-            console.log(`[META OAUTH SEQUENCE Step 4/6] Initiating Multi-Stage Page Discovery...`);
+            console.log(`[META OAUTH SEQUENCE Step 4/6] Initiating Page Discovery...`);
             const discoveredMap = new Map<string, any>();
 
-            // STAGE 1: Standard User Pages (/me/accounts)
+            // STAGE 1: User Pages (/me/accounts) - Supported fields ONLY, no 'tasks'
             try {
-              console.log(`[META PAGE DISCOVERY] Step 1: Querying GET /me/accounts...`);
+              console.log(`[META PAGE DISCOVERY] Stage 1: Querying GET /me/accounts...`);
               const pagesRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/accounts`, {
                 params: {
-                  fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
+                  fields: "id,name,access_token,category,picture{url},instagram_business_account",
                   access_token: activeToken
                 }
               });
@@ -5261,30 +5218,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               if (metaError) lastMetaErrorObj = metaError;
               pagesHttpStatus = status;
               console.warn(`[META DISCOVERY STAGE 1 WARN] GET /me/accounts query failed (HTTP ${status}):`, JSON.stringify(sanitizeForLogging(metaError || err.message)));
-            }
-
-            // STAGE 1b: User Business Assigned Pages (/me/assigned_pages)
-            try {
-              console.log(`[META PAGE DISCOVERY] Step 1b: Querying GET /me/assigned_pages...`);
-              const assignedRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/assigned_pages`, {
-                params: {
-                  fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
-                  access_token: activeToken
-                }
-              });
-              console.log(`[META DISCOVERY STAGE 1b LOG] GET /me/assigned_pages - HTTP ${assignedRes.status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(assignedRes.data)));
-              if (Array.isArray(assignedRes.data?.data)) {
-                assignedRes.data.data.forEach((p: any) => {
-                  if (p.id && p.name && !discoveredMap.has(p.id)) {
-                    console.log(`[META DISCOVERY STAGE 1b SUCCESS] Found Page ${p.name} (${p.id}) via /me/assigned_pages`);
-                    discoveredMap.set(p.id, p);
-                  }
-                });
-              }
-              console.log(`[META DISCOVERY STAGE 1b] Found ${discoveredMap.size} total page(s) after /me/assigned_pages.`);
-            } catch (aErr: any) {
-              const status = aErr.response?.status || "ERROR";
-              console.log(`[META DISCOVERY STAGE 1b LOG] GET /me/assigned_pages - HTTP ${status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(aErr.response?.data || aErr.message)));
             }
 
             // STAGE 2: Direct Target ID Candidate Page Discovery (including 1340053172514256 and Business Login granular_scopes)
@@ -5318,7 +5251,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             for (const targetId of candidateTargetIds) {
               const associatedScopes = targetIdMap.get(targetId) || [];
               if (discoveredMap.has(targetId)) {
-                console.log(`[META DISCOVERY STAGE 2] Target ID ${targetId} already discovered in previous stages.`);
+                console.log(`[META DISCOVERY STAGE 2] Target ID ${targetId} already discovered via /me/accounts.`);
                 targetIdsClassification.push({
                   id: targetId,
                   scope: associatedScopes.join(","),
@@ -5328,12 +5261,14 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 continue;
               }
 
-              console.log(`[META DISCOVERY STAGE 2 LOG] Querying GET /${targetId} with Page discovery fields...`);
-              let directPageSuccess = false;
+              console.log(`[META DISCOVERY STAGE 2 LOG] Querying GET /${targetId} with supported Page fields...`);
+              let pageResolved = false;
+
+              // Primary Query: Full supported fields (NO 'tasks')
               try {
                 const targetRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
                   params: {
-                    fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
+                    fields: "id,name,access_token,category,picture{url},instagram_business_account",
                     access_token: activeToken
                   }
                 });
@@ -5342,8 +5277,8 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
 
                 const pData = targetRes.data;
                 if (pData && pData.id && pData.name) {
-                  directPageSuccess = true;
-                  console.log(`[META DISCOVERY STAGE 2 PAGE SUCCESS] Target ID ${targetId} is CONFIRMED as a Facebook Page node! Name: ${pData.name} | Category: ${pData.category || "N/A"} | Has Page Access Token: ${!!pData.access_token} | Tasks: [${(pData.tasks || []).join(", ")}] | Instagram Linked: ${!!pData.instagram_business_account}`);
+                  pageResolved = true;
+                  console.log(`[META DISCOVERY STAGE 2 PAGE SUCCESS] Target ID ${targetId} CONFIRMED as Facebook Page node! Name: "${pData.name}" | Category: ${pData.category || "N/A"} | Has Page Access Token: ${!!pData.access_token} | Instagram Linked: ${!!pData.instagram_business_account}`);
 
                   // If access_token was not returned in direct field query, attempt explicit token query
                   if (!pData.access_token) {
@@ -5374,88 +5309,49 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 console.warn(`[META DISCOVERY STAGE 2 LOG] GET /${targetId} - HTTP ${status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(tErr.response?.data || tErr.message)));
               }
 
-              // If direct Page lookup did not succeed, inspect candidate as a Business Account node
-              if (!directPageSuccess) {
-                console.log(`[META DISCOVERY STAGE 2 BIZ] Direct Page lookup for ${targetId} failed. Querying Business Account page endpoints...`);
-                targetIdsClassification.push({
-                  id: targetId,
-                  scope: associatedScopes.join(","),
-                  nodeType: "Meta Business Account Candidate",
-                  name: "Business Node"
-                });
-
-                const bizEndpoints = ["owned_pages", "client_pages", "assigned_pages", "pages"];
-                for (const ep of bizEndpoints) {
-                  try {
-                    const bpRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}/${ep}`, {
-                      params: {
-                        fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
-                        access_token: activeToken
-                      }
-                    });
-                    console.log(`[META DISCOVERY STAGE 2 BIZ LOG] GET /${targetId}/${ep} - HTTP ${bpRes.status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(bpRes.data)));
-                    if (Array.isArray(bpRes.data?.data)) {
-                      bpRes.data.data.forEach((p: any) => {
-                        if (p.id && p.name && !discoveredMap.has(p.id)) {
-                          console.log(`[META DISCOVERY STAGE 2 BIZ SUCCESS] Discovered Page ${p.name} (${p.id}) under Business ${targetId} via /${ep}`);
-                          discoveredMap.set(p.id, p);
-                        }
-                      });
+              // Retry fallback: Minimal supported fields (id,name,category) if full field query failed
+              if (!pageResolved) {
+                try {
+                  console.log(`[META DISCOVERY STAGE 2 MINIMAL] Retrying GET /${targetId}?fields=id,name,category...`);
+                  const minRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                    params: {
+                      fields: "id,name,category",
+                      access_token: activeToken
                     }
-                  } catch (bizSubErr: any) {
-                    const subStatus = bizSubErr.response?.status || "ERROR";
-                    console.log(`[META DISCOVERY STAGE 2 BIZ LOG] GET /${targetId}/${ep} - HTTP ${subStatus} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(bizSubErr.response?.data || bizSubErr.message)));
-                  }
-                }
-              }
-            }
+                  });
+                  const minData = minRes.data;
+                  if (minData && minData.id && minData.name) {
+                    pageResolved = true;
+                    console.log(`[META DISCOVERY STAGE 2 MINIMAL SUCCESS] Target ID ${targetId} minimal lookup succeeded! Name: "${minData.name}"`);
 
-            // STAGE 3: Business Manager User Account Discovery (/me/businesses)
-            try {
-              console.log(`[META DISCOVERY STAGE 3] Querying GET /me/businesses...`);
-              const bizRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/me/businesses`, {
-                params: { access_token: activeToken }
-              });
-              console.log(`[META DISCOVERY STAGE 3 LOG] GET /me/businesses - HTTP ${bizRes.status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(bizRes.data)));
-              const bizList = Array.isArray(bizRes.data?.data) ? bizRes.data.data : [];
-              if (bizList.length > 0) {
-                console.log(`[META DISCOVERY STAGE 3] Found ${bizList.length} Business Account(s). Querying pages...`);
-                for (const biz of bizList) {
-                  const bizEndpoints = ["owned_pages", "client_pages", "assigned_pages", "pages"];
-                  for (const ep of bizEndpoints) {
                     try {
-                      const bpRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${biz.id}/${ep}`, {
-                        params: {
-                          fields: "id,name,access_token,tasks,category,picture{url},instagram_business_account",
-                          access_token: activeToken
-                        }
+                      const tokRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${targetId}`, {
+                        params: { fields: "access_token", access_token: activeToken }
                       });
-                      console.log(`[META DISCOVERY STAGE 3 BIZ LOG] GET /${biz.id}/${ep} - HTTP ${bpRes.status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(bpRes.data)));
-                      if (Array.isArray(bpRes.data?.data)) {
-                        bpRes.data.data.forEach((p: any) => {
-                          if (p.id && p.name && !discoveredMap.has(p.id)) {
-                            console.log(`[META DISCOVERY STAGE 3 SUCCESS] Found Page ${p.name} (${p.id}) under Business ${biz.id} via /${ep}`);
-                            discoveredMap.set(p.id, p);
-                          }
-                        });
+                      if (tokRes.data?.access_token) {
+                        minData.access_token = tokRes.data.access_token;
                       }
-                    } catch (e: any) {
-                      const subStatus = e.response?.status || "ERROR";
-                      console.log(`[META DISCOVERY STAGE 3 BIZ LOG] GET /${biz.id}/${ep} - HTTP ${subStatus} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(e.response?.data || e.message)));
-                    }
+                    } catch (e) {}
+
+                    discoveredMap.set(minData.id, minData);
+                    targetIdsClassification.push({
+                      id: targetId,
+                      scope: associatedScopes.join(","),
+                      nodeType: "Facebook Page",
+                      name: minData.name
+                    });
                   }
+                } catch (minErr: any) {
+                  console.warn(`[META DISCOVERY STAGE 2 MINIMAL ERR] Minimal lookup for ${targetId} failed:`, minErr.message);
                 }
               }
-            } catch (bizErr: any) {
-              const status = bizErr.response?.status || "ERROR";
-              console.log(`[META DISCOVERY STAGE 3 LOG] GET /me/businesses - HTTP ${status} - Sanitized Response:`, JSON.stringify(sanitizeForLogging(bizErr.response?.data || bizErr.message)));
             }
 
             const pagesData = Array.from(discoveredMap.values());
 
             if (pagesData.length > 0) {
               for (const p of pagesData) {
-                console.log(`[META OAUTH SEQUENCE Step 5/6] Page discovered: ID ${p.id} | Name: ${p.name} | Tasks: [${(p.tasks || []).join(", ")}]`);
+                console.log(`[META OAUTH SEQUENCE Step 5/6] Page discovered: ID ${p.id} | Name: "${p.name}" | Category: ${p.category || "N/A"}`);
 
                 let effectiveToken = p.access_token || activeToken;
                 let picUrl = p.picture?.data?.url || "";
@@ -5499,7 +5395,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                   name: p.name,
                   accessToken: effectiveToken,
                   avatar: picUrl,
-                  tasks: p.tasks || [],
                   category: p.category || "Facebook Page",
                   instagramBusinessAccount: igInfo,
                   type: "Live Page"
