@@ -6569,129 +6569,144 @@ app.post("/api/campaigns/copilot-regenerate-section", authGuard, async (req: any
   res.json({ success: true, text: fallbackText });
 });
 
+// Global process error handlers to prevent container crash / 502 on unexpected runtime exceptions
+process.on("uncaughtException", (err) => {
+  console.error("[UNCAUGHT EXCEPTION PREVENTED]", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[UNHANDLED REJECTION PREVENTED]", reason);
+});
+
 // Automatically execute scheduled posts check cycle (Run background checks every 20 seconds)
 setInterval(() => {
-  const now = new Date();
-  let stateChanged = false;
+  try {
+    const now = new Date();
+    let stateChanged = false;
 
-  Object.keys(userCampaigns).forEach(email => {
-    const list = userCampaigns[email];
-    list.forEach(camp => {
-      // Check for future campaigns scheduled and ready for publish
-      if (camp.status === "Scheduled" || (camp.status === "Active" && camp.scheduledDate)) {
-        const schDate = camp.scheduledDate || camp.startDate;
-        if (schDate) {
-          const runTime = new Date(schDate);
-          if (runTime <= now && !camp.publishedAt) {
-            console.log(`[SAAS AUTOPUBLISHER] Processing Scheduled campaign broadcast: "${camp.name}" (ID: ${camp.id}) belonging to: ${email}`);
+    Object.keys(userCampaigns || {}).forEach(email => {
+      const list = userCampaigns[email];
+      if (Array.isArray(list)) {
+        list.forEach(camp => {
+          // Check for future campaigns scheduled and ready for publish
+          if (camp && (camp.status === "Scheduled" || (camp.status === "Active" && camp.scheduledDate))) {
+            const schDate = camp.scheduledDate || camp.startDate;
+            if (schDate) {
+              const runTime = new Date(schDate);
+              if (runTime <= now && !camp.publishedAt) {
+                console.log(`[SAAS AUTOPUBLISHER] Processing Scheduled campaign broadcast: "${camp.name}" (ID: ${camp.id}) belonging to: ${email}`);
 
-            // Execute the automated publishing integration
-            executePublishCampaign(email, camp).then(result => {
-              // Add publish history records
-              const historyList = getScopedPublishHistory(email);
-              const mName = mockUsers.find(u => u.email.toLowerCase() === email)?.ownerName || "Jane Doe";
-              const nowStr = new Date();
-              const pubDate = nowStr.toISOString().split("T")[0];
-              const pubTime = nowStr.toTimeString().split(" ")[0];
+                // Execute the automated publishing integration
+                executePublishCampaign(email, camp).then(result => {
+                  // Add publish history records
+                  const historyList = getScopedPublishHistory(email);
+                  const mName = mockUsers.find(u => u.email.toLowerCase() === email)?.ownerName || "Jane Doe";
+                  const nowStr = new Date();
+                  const pubDate = nowStr.toISOString().split("T")[0];
+                  const pubTime = nowStr.toTimeString().split(" ")[0];
 
-              (camp.platforms || []).forEach((plat: string) => {
-                historyList.unshift({
-                  id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                  campaignId: camp.id,
-                  campaignName: camp.name || "Scheduled Broadcast",
-                  merchantEmail: email,
-                  merchantName: mName,
-                  platform: plat.toLowerCase() as any,
-                  publishDate: pubDate,
-                  publishTime: pubTime,
-                  status: "SUCCESS",
-                  postId: `${plat.toLowerCase() === 'google' ? 'gbp' : plat.toLowerCase().substring(0, 2)}-post-${Math.floor(Math.random() * 100000000)}`,
-                  caption: camp.generatedCaption || "",
-                  bannerUrl: camp.bannerUrl || ""
+                  (camp.platforms || []).forEach((plat: string) => {
+                    historyList.unshift({
+                      id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                      campaignId: camp.id,
+                      campaignName: camp.name || "Scheduled Broadcast",
+                      merchantEmail: email,
+                      merchantName: mName,
+                      platform: plat.toLowerCase() as any,
+                      publishDate: pubDate,
+                      publishTime: pubTime,
+                      status: "SUCCESS",
+                      postId: `${plat.toLowerCase() === 'google' ? 'gbp' : plat.toLowerCase().substring(0, 2)}-post-${Math.floor(Math.random() * 100000000)}`,
+                      caption: camp.generatedCaption || "",
+                      bannerUrl: camp.bannerUrl || ""
+                    });
+                  });
+
+                  if (camp.recurring === "weekly") {
+                    // Calculate next week's date for recurring schedule
+                    const nextDate = new Date(schDate);
+                    nextDate.setDate(nextDate.getDate() + 7);
+
+                    // Clone completed run for statistics archiving
+                    const runClone = {
+                      ...camp,
+                      id: `camp-run-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                      status: "Completed",
+                      publishedAt: new Date().toISOString(),
+                      recurring: "none"
+                    };
+                    list.push(runClone);
+
+                    // Advance original campaign timer to next week
+                    camp.scheduledDate = nextDate.toISOString();
+                    camp.startDate = nextDate.toISOString().split("T")[0];
+                    camp.publishedAt = undefined;
+                  } else {
+                    camp.status = "Completed";
+                    camp.publishedAt = new Date().toISOString();
+                    camp.reach = result.metrics.reach;
+                    camp.engagement = result.metrics.engagement;
+                    camp.leads = result.metrics.clicks;
+                  }
+
+                  addSystemNotification(email, {
+                    title: "Scheduled Campaign Dispatched",
+                    message: `Automated scheduled broadcast for "${camp.name}" is now live on connected social media channels.`,
+                    type: "success"
+                  });
+
+                  saveDbState();
+                }).catch(err => {
+                  // Add failed publish history records
+                  const historyList = getScopedPublishHistory(email);
+                  const mName = mockUsers.find(u => u.email.toLowerCase() === email)?.ownerName || "Jane Doe";
+                  const nowStr = new Date();
+                  const pubDate = nowStr.toISOString().split("T")[0];
+                  const pubTime = nowStr.toTimeString().split(" ")[0];
+
+                  (camp.platforms || []).forEach((plat: string) => {
+                    historyList.unshift({
+                      id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                      campaignId: camp.id,
+                      campaignName: camp.name || "Scheduled Broadcast",
+                      merchantEmail: email,
+                      merchantName: mName,
+                      platform: plat.toLowerCase() as any,
+                      publishDate: pubDate,
+                      publishTime: pubTime,
+                      status: "FAILED",
+                      postId: "N/A",
+                      errorMessage: err.message || "Scheduled publication failed",
+                      caption: camp.generatedCaption || "",
+                      bannerUrl: camp.bannerUrl || ""
+                    });
+                  });
+
+                  camp.status = "Draft"; // Allow retry
+                  camp.lastError = err.message;
+
+                  addSystemNotification(email, {
+                    title: "Scheduled Dispatch Failed",
+                    message: `Automated campaign delivery of "${camp.name}" failed: ${err.message}`,
+                    type: "alert"
+                  });
+
+                  saveDbState();
                 });
-              });
 
-              if (camp.recurring === "weekly") {
-                // Calculate next week's date for recurring schedule
-                const nextDate = new Date(schDate);
-                nextDate.setDate(nextDate.getDate() + 7);
-
-                // Clone completed run for statistics archiving
-                const runClone = {
-                  ...camp,
-                  id: `camp-run-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                  status: "Completed",
-                  publishedAt: new Date().toISOString(),
-                  recurring: "none"
-                };
-                list.push(runClone);
-
-                // Advance original campaign timer to next week
-                camp.scheduledDate = nextDate.toISOString();
-                camp.startDate = nextDate.toISOString().split("T")[0];
-                camp.publishedAt = undefined;
-              } else {
-                camp.status = "Completed";
-                camp.publishedAt = new Date().toISOString();
-                camp.reach = result.metrics.reach;
-                camp.engagement = result.metrics.engagement;
-                camp.leads = result.metrics.clicks;
+                stateChanged = true;
               }
-
-              addSystemNotification(email, {
-                title: "Scheduled Campaign Dispatched",
-                message: `Automated scheduled broadcast for "${camp.name}" is now live on connected social media channels.`,
-                type: "success"
-              });
-
-              saveDbState();
-            }).catch(err => {
-              // Add failed publish history records
-              const historyList = getScopedPublishHistory(email);
-              const mName = mockUsers.find(u => u.email.toLowerCase() === email)?.ownerName || "Jane Doe";
-              const nowStr = new Date();
-              const pubDate = nowStr.toISOString().split("T")[0];
-              const pubTime = nowStr.toTimeString().split(" ")[0];
-
-              (camp.platforms || []).forEach((plat: string) => {
-                historyList.unshift({
-                  id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                  campaignId: camp.id,
-                  campaignName: camp.name || "Scheduled Broadcast",
-                  merchantEmail: email,
-                  merchantName: mName,
-                  platform: plat.toLowerCase() as any,
-                  publishDate: pubDate,
-                  publishTime: pubTime,
-                  status: "FAILED",
-                  postId: "N/A",
-                  errorMessage: err.message || "Scheduled publication failed",
-                  caption: camp.generatedCaption || "",
-                  bannerUrl: camp.bannerUrl || ""
-                });
-              });
-
-              camp.status = "Draft"; // Allow retry
-              camp.lastError = err.message;
-
-              addSystemNotification(email, {
-                title: "Scheduled Dispatch Failed",
-                message: `Automated campaign delivery of "${camp.name}" failed: ${err.message}`,
-                type: "alert"
-              });
-
-              saveDbState();
-            });
-
-            stateChanged = true;
+            }
           }
-        }
+        });
       }
     });
-  });
 
-  if (stateChanged) {
-    saveDbState();
+    if (stateChanged) {
+      saveDbState();
+    }
+  } catch (loopErr) {
+    console.error("[AUTOPUBLISHER LOOP ERROR]", loopErr);
   }
 }, 20000);
 
@@ -6711,13 +6726,25 @@ async function startServer() {
     console.log(`[SERVE FRONTEND] Serving static UI app from: ${distPath}`);
     app.use(express.static(distPath));
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api")) return next();
+      if (req.path.startsWith("/api") || req.path.startsWith("/auth") || req.path.startsWith("/health")) return next();
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
+  // Explicit health check endpoints for cloud infrastructure (Render / GCP)
+  app.get("/health", (req, res) => {
+    res.status(200).json({ status: "OK", service: "Hyperlocal Campaign API", timestamp: new Date().toISOString() });
+  });
+
+  app.get("/", (req, res) => {
+    if (distPath && fs.existsSync(path.join(distPath, "index.html"))) {
+      return res.sendFile(path.join(distPath, "index.html"));
+    }
+    return res.status(200).json({ status: "OK", service: "Hyperlocal Campaign API", timestamp: new Date().toISOString() });
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[EXPRESS SERVICE SERVER STARTED] Backend API service listening on http://localhost:${PORT}`);
+    console.log(`[EXPRESS SERVICE SERVER STARTED] Backend API service listening on http://0.0.0.0:${PORT} (PORT=${PORT})`);
   });
 }
 
