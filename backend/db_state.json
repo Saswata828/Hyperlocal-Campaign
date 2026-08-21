@@ -2,7 +2,7 @@
   "mockUsers": [
     {
       "email": "merchant@hyperlocal.ai",
-      "password": "$2b$10$RaW3yukiDrq6bvaZ9QBiieCoI1x1ZUEm8wUJnSNtrByHHX4wW/bqC",
+      "password": "$2b$10$YlYZ3vapb/KntB.Kq7eluObQc80Hb/QgfQLYhHM0FAXLF28frkHyq",
       "businessName": "Hyperlocal Organics Test MerchantLtdTest Merchant",
       "ownerName": "Jane Doe",
       "mobileNumber": "9876543210",
