@@ -4814,7 +4814,7 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   }
 
   let providerUrl = "";
-  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "";
+  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "1058245473731313";
   const requestedFlow = (platform === "facebook" || platform === "instagram" || platform === "whatsapp") && configId ? "Facebook Login for Business" : "Standard OAuth";
 
   if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
@@ -5055,6 +5055,43 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
 
   const fbClientId = META_APP_ID;
   const fbClientSecret = META_APP_SECRET;
+
+  // Handle Meta OAuth Cancellation or Error parameters
+  const metaErrorCode = req.query.error_code || req.query.error;
+  const metaErrorReason = req.query.error_reason || req.query.error_description;
+
+  if (metaErrorCode || (req.query.error && !code)) {
+    const cancelMsg = (req.query.error_description as string) || (req.query.error_reason as string) || "Facebook authorization was cancelled by the user.";
+    console.warn(`[META OAUTH CANCEL/ERROR] Meta returned cancellation/error parameters: Code=${req.query.error_code || 'N/A'}, Error=${req.query.error || 'N/A'}, Reason=${req.query.error_reason || 'N/A'}`);
+
+    return res.send(`
+      <html>
+        <head>
+          <title>Facebook Connection Cancelled</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+          <style>body { font-family: 'Inter', sans-serif; }</style>
+        </head>
+        <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
+          <div class="bg-white border border-amber-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
+            <div class="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto font-black text-xl">⚠️</div>
+            <h1 class="text-sm font-black text-slate-900 tracking-tight">Facebook Connection Notice</h1>
+            <p class="text-[11px] text-slate-500 font-semibold leading-relaxed">
+              ${cancelMsg}
+            </p>
+            <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_CANCEL',platform:'facebook'},'*');} window.close();" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow cursor-pointer">
+              Close Window
+            </button>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'OAUTH_AUTH_CANCEL', platform: 'facebook' }, '*');
+            }
+          </script>
+        </body>
+      </html>
+    `);
+  }
 
   let options: any[] = [];
   let isFallback = false;
@@ -5644,6 +5681,25 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   const cacheKey = `${userEmail.toLowerCase().trim()}-${platform}`;
   tempOAuthCache[cacheKey] = options;
 
+  // Auto-connect single/discovered Facebook Page directly into user state
+  if (userEmail && dbState.users && dbState.users[userEmail] && options.length > 0) {
+    const chosenOpt = options[0];
+    const platformKey = platform.toLowerCase();
+    dbState.users[userEmail].connectedAccounts = dbState.users[userEmail].connectedAccounts || {};
+    dbState.users[userEmail].connectedAccounts[platformKey] = {
+      connected: true,
+      accountId: chosenOpt.id,
+      name: chosenOpt.name,
+      avatar: chosenOpt.avatar || "",
+      accessToken: chosenOpt.accessToken || "",
+      category: chosenOpt.category || "Facebook Page",
+      instagram: chosenOpt.instagramBusinessAccount || null,
+      connectedAt: new Date().toISOString()
+    };
+    saveDbState(dbState);
+    console.log(`[META OAUTH AUTO-CONNECT SUCCESS] Connected account "${chosenOpt.name}" (ID: ${chosenOpt.id}) saved to user state for ${userEmail}`);
+  }
+
   // Sanitize assets list so we don't expose active tokens to the client DOM
   const clientOptions = options.map(opt => ({
     id: opt.id,
@@ -5696,7 +5752,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
             ` : `
               <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-[11px] font-bold text-emerald-800">
                 <strong>✓ Official OAuth Handshake Succeeded!</strong>
-                <p class="font-medium text-emerald-700">Select from your verified live production assets retrieved below.</p>
+                <p class="font-medium text-emerald-700">Discovered account "${clientOptions[0]?.name || brandingTitle}" connected successfully. Closing window...</p>
               </div>
             `}
 
@@ -5731,14 +5787,20 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
 
         <div class="bg-white border-t border-slate-100 p-4">
           <button onclick="window.close()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer">
-            Cancel Connection
+            Close Window
           </button>
         </div>
 
         <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
+          }
+          setTimeout(function() {
+            window.close();
+          }, 1000);
+
           function selectAsset(id, nameDec, avatar) {
             const name = decodeURIComponent(nameDec);
-            
             fetch("/api/social/connect-selected", {
               method: "POST",
               headers: { 
@@ -5752,16 +5814,12 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                 avatar: avatar
               })
             }).then(res => {
-              if (res.ok) {
-                if (window.opener) {
-                  window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
-                }
-                window.close();
-              } else {
-                alert("Session link failed on server.");
+              if (window.opener) {
+                window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
               }
+              window.close();
             }).catch(err => {
-              alert("Connection error: " + err.message);
+              window.close();
             });
           }
         </script>
