@@ -95,6 +95,7 @@ function logGeminiError(context: string, error: any) {
 
 // Create Express instance
 const app = express();
+app.set("trust proxy", 1);
 
 // Enable CORS for Vercel / cross-origin deployments with production domain security
 app.use((req, res, next) => {
@@ -131,6 +132,14 @@ const META_APP_ID = process.env.META_APP_ID || process.env.FACEBOOK_APP_ID || ""
 const META_APP_SECRET = process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "";
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI || "";
 const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || "";
+
+function getCanonicalRedirectUri(req: any, fallbackPath: string = "/auth/social-callback"): string {
+  if (META_REDIRECT_URI) return META_REDIRECT_URI.split("?")[0];
+  const host = (req?.get ? req.get("host") : "") || "localhost:8080";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const proto = (req?.protocol === "https" || req?.headers?.["x-forwarded-proto"] === "https" || !isLocal) ? "https" : "http";
+  return `${proto}://${host}${fallbackPath}`.split("?")[0];
+}
 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
 const tempOAuthCache: { [key: string]: any[] } = {};
@@ -4777,7 +4786,7 @@ app.get("/auth/social-sandbox", (req, res) => {
 
 app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   const { platform } = req.query;
-  const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
+  const redirectUri = getCanonicalRedirectUri(req, "/auth/social-callback");
 
   // Generate a cryptographically signed state token containing user session details
   const statePayload = {
@@ -5077,7 +5086,7 @@ app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
   const { code, state } = req.query;
-  const redirectUri = (META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/social-callback`).split("?")[0];
+  const redirectUri = getCanonicalRedirectUri(req, "/auth/social-callback");
 
   let verifiedState: any = null;
   if (state) {
@@ -5093,6 +5102,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   let options: any[] = [];
   let isFallback = false;
   let rawTokenInfo: any = {};
+  let activeToken = "";
   let errorMessage = "";
   let lastMetaErrorObj: any = null;
   let profileName = "Facebook User";
@@ -5178,7 +5188,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
           rawTokenInfo.longLivedAccessToken = userAccessToken;
         }
 
-        const activeToken = rawTokenInfo.longLivedAccessToken;
+        activeToken = rawTokenInfo.longLivedAccessToken || userAccessToken;
 
         // Step 3: Fetch basic profile info (/me)
         try {
