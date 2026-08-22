@@ -5678,15 +5678,15 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   }
 
   // Cache access tokens securely on the backend
-  const cacheKey = `${userEmail.toLowerCase().trim()}-${platform}`;
+  const cacheKey = `${email.toLowerCase().trim()}-${platform}`;
   tempOAuthCache[cacheKey] = options;
 
   // Auto-connect single/discovered Facebook Page directly into user state
-  if (userEmail && dbState.users && dbState.users[userEmail] && options.length > 0) {
+  if (email && dbState.users && dbState.users[email] && options.length > 0) {
     const chosenOpt = options[0];
     const platformKey = platform.toLowerCase();
-    dbState.users[userEmail].connectedAccounts = dbState.users[userEmail].connectedAccounts || {};
-    dbState.users[userEmail].connectedAccounts[platformKey] = {
+    dbState.users[email].connectedAccounts = dbState.users[email].connectedAccounts || {};
+    dbState.users[email].connectedAccounts[platformKey] = {
       connected: true,
       accountId: chosenOpt.id,
       name: chosenOpt.name,
@@ -5697,7 +5697,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
       connectedAt: new Date().toISOString()
     };
     saveDbState(dbState);
-    console.log(`[META OAUTH AUTO-CONNECT SUCCESS] Connected account "${chosenOpt.name}" (ID: ${chosenOpt.id}) saved to user state for ${userEmail}`);
+    console.log(`[META OAUTH AUTO-CONNECT SUCCESS] Connected account "${chosenOpt.name}" (ID: ${chosenOpt.id}) saved to user state for ${email}`);
   }
 
   // Sanitize assets list so we don't expose active tokens to the client DOM
