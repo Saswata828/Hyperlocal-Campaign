@@ -80,17 +80,32 @@ export const ConnectedAccounts: React.FC = () => {
     googleAccessToken: ''
   });
 
+  // Popup tracking ref for window message event cleanup
+  const activePopupRef = React.useRef<{ window: Window | null; timer: any }>({ window: null, timer: null });
+
+  const isAllowedOrigin = (origin: string) => {
+    if (!origin) return false;
+    if (origin === window.location.origin) return true;
+    try {
+      const originHost = new URL(origin).hostname;
+      return (
+        originHost === window.location.hostname ||
+        originHost === 'localhost' ||
+        originHost === '127.0.0.1' ||
+        originHost.endsWith('.onrender.com') ||
+        originHost.endsWith('.vercel.app')
+      );
+    } catch (e) {
+      return false;
+    }
+  };
+
   const fetchConnections = async (isRetry = false) => {
     setLoading(true);
     try {
-      const response = await fetch(getApiUrl('/api/social/connections'), {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setConnections(data.connections || []);
+      const data = await apiService.getSocialConnections();
+      if (data && Array.isArray(data.connections)) {
+        setConnections(data.connections);
         if (data.credentials) {
           setDevConfig(prev => ({
             ...prev,
@@ -98,12 +113,6 @@ export const ConnectedAccounts: React.FC = () => {
           }));
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          showAlert('error', 'Session authentication expired or invalid. Please sign in again.');
-        } else {
-          showAlert('error', errData.message || `Backend returned status HTTP ${response.status}`);
-        }
         setConnections([
           { platform: 'facebook', connected: false },
           { platform: 'instagram', connected: false },
@@ -119,7 +128,6 @@ export const ConnectedAccounts: React.FC = () => {
         return;
       }
       showAlert('error', 'Unable to connect to backend server. Render service may be waking up from sleep mode.');
-      // Fallback local memory values if backend fails initially
       setConnections([
         { platform: 'facebook', connected: false },
         { platform: 'instagram', connected: false },
@@ -133,6 +141,65 @@ export const ConnectedAccounts: React.FC = () => {
 
   React.useEffect(() => {
     fetchConnections();
+
+    // Handler for postMessage events emitted by OAuth callback popup
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (!isAllowedOrigin(event.origin)) {
+        return;
+      }
+
+      const { type, platform, error } = event.data || {};
+
+      if (type === 'OAUTH_AUTH_SUCCESS') {
+        if (activePopupRef.current.timer) {
+          clearInterval(activePopupRef.current.timer);
+          activePopupRef.current.timer = null;
+        }
+        if (activePopupRef.current.window && !activePopupRef.current.window.closed) {
+          activePopupRef.current.window.close();
+          activePopupRef.current.window = null;
+        }
+
+        setActionLoading(null);
+
+        // Instantly refresh real social connections from backend
+        try {
+          const freshData = await apiService.getSocialConnections();
+          if (freshData && Array.isArray(freshData.connections)) {
+            setConnections(freshData.connections);
+          }
+        } catch (e) {
+          await fetchConnections();
+        }
+
+        const platformName = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Social';
+        showAlert('success', `${platformName} account connected successfully!`);
+      } else if (type === 'OAUTH_AUTH_CANCEL') {
+        if (activePopupRef.current.timer) {
+          clearInterval(activePopupRef.current.timer);
+          activePopupRef.current.timer = null;
+        }
+        if (activePopupRef.current.window && !activePopupRef.current.window.closed) {
+          activePopupRef.current.window.close();
+          activePopupRef.current.window = null;
+        }
+        setActionLoading(null);
+        showAlert('error', 'OAuth authorization was cancelled.');
+      } else if (type === 'OAUTH_AUTH_FAILURE') {
+        if (activePopupRef.current.timer) {
+          clearInterval(activePopupRef.current.timer);
+          activePopupRef.current.timer = null;
+        }
+        if (activePopupRef.current.window && !activePopupRef.current.window.closed) {
+          activePopupRef.current.window.close();
+          activePopupRef.current.window = null;
+        }
+        setActionLoading(null);
+        showAlert('error', error || 'OAuth authorization failed.');
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
 
     // Expose global checkLoginState for Meta login button callbacks
     (window as any).checkLoginState = () => {
@@ -180,6 +247,13 @@ export const ConnectedAccounts: React.FC = () => {
         console.warn('FB.getLoginStatus check skipped:', err);
       }
     }
+
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+      if (activePopupRef.current.timer) {
+        clearInterval(activePopupRef.current.timer);
+      }
+    };
   }, []);
 
   const showAlert = (type: 'success' | 'error', message: string) => {
@@ -217,13 +291,24 @@ export const ConnectedAccounts: React.FC = () => {
           `width=${width},height=${height},left=${left},top=${top}`
         );
 
+        if (activePopupRef.current.timer) {
+          clearInterval(activePopupRef.current.timer);
+        }
+        activePopupRef.current.window = popup;
+
         const checkTimer = setInterval(() => {
           if (!popup || popup.closed) {
             clearInterval(checkTimer);
+            if (activePopupRef.current.timer === checkTimer) {
+              activePopupRef.current.timer = null;
+              activePopupRef.current.window = null;
+            }
             setActionLoading(null);
             fetchConnections();
           }
         }, 1000);
+
+        activePopupRef.current.timer = checkTimer;
       }
     } catch (err: any) {
       showAlert('error', err.message || 'Failed to initiate social connection.');

@@ -134,11 +134,20 @@ const META_REDIRECT_URI = process.env.META_REDIRECT_URI || "";
 const META_BUSINESS_LOGIN_CONFIG_ID = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || "";
 
 function getCanonicalRedirectUri(req: any, fallbackPath: string = "/auth/social-callback"): string {
-  if (META_REDIRECT_URI) return META_REDIRECT_URI.split("?")[0];
-  const host = (req?.get ? req.get("host") : "") || "localhost:8080";
-  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-  const proto = (req?.protocol === "https" || req?.headers?.["x-forwarded-proto"] === "https" || !isLocal) ? "https" : "http";
-  return `${proto}://${host}${fallbackPath}`.split("?")[0];
+  const rawHost = (req?.get ? req.get("host") : "") || req?.headers?.host || "localhost:8080";
+  const cleanHost = rawHost.replace(/^https?:\/\//, "").trim();
+  const isLocal = cleanHost.includes("localhost") || cleanHost.includes("127.0.0.1") || cleanHost.includes("::1");
+
+  if (isLocal) {
+    return `http://${cleanHost}${fallbackPath}`.split("?")[0];
+  }
+
+  if (META_REDIRECT_URI) {
+    return META_REDIRECT_URI.split("?")[0];
+  }
+
+  const proto = (req?.protocol === "https" || req?.headers?.["x-forwarded-proto"] === "https") ? "https" : "https";
+  return `${proto}://${cleanHost}${fallbackPath}`.split("?")[0];
 }
 
 // Secure backend cache for temporary Page/Account OAuth tokens. Maps `${email}-${platform}` to options array.
@@ -4908,7 +4917,8 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
 
   let userRequest: any = { status: null, data: null, error: null };
   let accountsRequest: any = { status: null, data: null, error: null };
-  let targetIdPageRequest: any = { status: null, targetId: "1340053172514256", isPageNode: false, data: null, error: null };
+  const requestedTargetId = (req.query.pageId || req.body?.pageId || "").toString().trim();
+  let targetIdPageRequest: any = { status: null, targetId: requestedTargetId || "N/A", isPageNode: false, data: null, error: null };
 
   // 1. Query GET /me?fields=id,name
   try {
@@ -4941,22 +4951,24 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
     console.warn(`[META RAW DEBUG] GET /me/accounts - HTTP ${accountsRequest.status} - Sanitized Response:`, JSON.stringify(accountsRequest.error));
   }
 
-  // 3. Query GET /1340053172514256 (Candidate Page Target ID - supported fields ONLY)
-  try {
-    const targetRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/1340053172514256`, {
-      params: {
-        fields: "id,name,access_token,category,picture{url},instagram_business_account",
-        access_token: activeToken
-      }
-    });
-    targetIdPageRequest.status = targetRes.status;
-    targetIdPageRequest.data = sanitizeForLogging(targetRes.data);
-    targetIdPageRequest.isPageNode = !!(targetRes.data?.id && targetRes.data?.name);
-    console.log(`[META RAW DEBUG] GET /1340053172514256 - HTTP ${targetRes.status} - Is Page Node: ${targetIdPageRequest.isPageNode} - Sanitized Response:`, JSON.stringify(targetIdPageRequest.data));
-  } catch (err: any) {
-    targetIdPageRequest.status = err.response?.status || 500;
-    targetIdPageRequest.error = sanitizeForLogging(err.response?.data?.error || err.message);
-    console.warn(`[META RAW DEBUG] GET /1340053172514256 - HTTP ${targetIdPageRequest.status} - Sanitized Response:`, JSON.stringify(targetIdPageRequest.error));
+  // 3. Query GET /:pageId (Candidate Page Target ID - supported fields ONLY if provided)
+  if (requestedTargetId) {
+    try {
+      const targetRes = await axios.get(`https://graph.facebook.com/${META_VERSION}/${requestedTargetId}`, {
+        params: {
+          fields: "id,name,access_token,category,picture{url},instagram_business_account",
+          access_token: activeToken
+        }
+      });
+      targetIdPageRequest.status = targetRes.status;
+      targetIdPageRequest.data = sanitizeForLogging(targetRes.data);
+      targetIdPageRequest.isPageNode = !!(targetRes.data?.id && targetRes.data?.name);
+      console.log(`[META RAW DEBUG] GET /${requestedTargetId} - HTTP ${targetRes.status} - Is Page Node: ${targetIdPageRequest.isPageNode} - Sanitized Response:`, JSON.stringify(targetIdPageRequest.data));
+    } catch (err: any) {
+      targetIdPageRequest.status = err.response?.status || 500;
+      targetIdPageRequest.error = sanitizeForLogging(err.response?.data?.error || err.message);
+      console.warn(`[META RAW DEBUG] GET /${requestedTargetId} - HTTP ${targetIdPageRequest.status} - Sanitized Response:`, JSON.stringify(targetIdPageRequest.error));
+    }
   }
 
   res.json({
@@ -4967,7 +4979,7 @@ app.get("/api/social/meta-raw-debug", authGuard, async (req: any, res) => {
 });
 
 app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
-  const pageId = (req.query.pageId || req.body?.pageId || "1340053172514256").toString().trim();
+  const pageId = (req.query.pageId || req.body?.pageId || "").toString().trim();
   const userEmail = (req.user?.email || "").toLowerCase().trim();
   const audit = oauthDebugAuditCache[userEmail] || oauthDebugAuditCache["latest"];
   const activeToken = audit?.activeToken || tempOAuthCache[`${userEmail}-facebook`]?.[0]?.accessToken;
@@ -5257,10 +5269,10 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               console.warn(`[META DISCOVERY STAGE 1 WARN] GET /me/accounts query failed (HTTP ${status}):`, JSON.stringify(sanitizeForLogging(metaError || err.message)));
             }
 
-            // STAGE 2: Direct Target ID Candidate Page Discovery (including 1340053172514256 and Business Login granular_scopes)
+            // STAGE 2: Direct Target ID Candidate Page Discovery (dynamically derived from Meta Business Login granular_scopes)
             const targetIdMap = new Map<string, string[]>();
             
-            // Collect target IDs from token debug info granular_scopes
+            // Collect target IDs dynamically from token debug info granular_scopes
             if (tokenDebugInfo?.granular_scopes && Array.isArray(tokenDebugInfo.granular_scopes)) {
               for (const gs of tokenDebugInfo.granular_scopes) {
                 if (gs.target_ids && Array.isArray(gs.target_ids)) {
@@ -5275,11 +5287,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
                   });
                 }
               }
-            }
-
-            // Always register 1340053172514256 as a primary candidate target ID
-            if (!targetIdMap.has("1340053172514256")) {
-              targetIdMap.set("1340053172514256", ["pages_show_list", "pages_read_engagement", "pages_manage_posts"]);
             }
 
             const candidateTargetIds = Array.from(targetIdMap.keys());
