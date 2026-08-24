@@ -5689,22 +5689,55 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   tempOAuthCache[cacheKey] = options;
 
   // Auto-connect single/discovered Facebook Page directly into user state
-  if (email && dbState.users && dbState.users[email] && options.length > 0) {
+  if (email && options.length > 0) {
     const chosenOpt = options[0];
     const platformKey = platform.toLowerCase();
-    dbState.users[email].connectedAccounts = dbState.users[email].connectedAccounts || {};
-    dbState.users[email].connectedAccounts[platformKey] = {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (dbState.users && dbState.users[cleanEmail]) {
+      dbState.users[cleanEmail].connectedAccounts = dbState.users[cleanEmail].connectedAccounts || {};
+      dbState.users[cleanEmail].connectedAccounts[platformKey] = {
+        connected: true,
+        accountId: chosenOpt.id,
+        name: chosenOpt.name,
+        avatar: chosenOpt.avatar || "",
+        accessToken: chosenOpt.accessToken || "",
+        category: chosenOpt.category || "Facebook Page",
+        instagram: chosenOpt.instagramBusinessAccount || null,
+        connectedAt: new Date().toISOString()
+      };
+      saveDbState(dbState);
+    }
+
+    if (!userSocialConnections[cleanEmail]) {
+      userSocialConnections[cleanEmail] = { connections: [], credentials: {} };
+    }
+
+    const encryptedToken = chosenOpt.accessToken ? encryptToken(chosenOpt.accessToken) : "";
+    userSocialConnections[cleanEmail].credentials.facebookPageId = chosenOpt.id;
+    userSocialConnections[cleanEmail].credentials.facebookAccessToken = encryptedToken;
+
+    const connections = userSocialConnections[cleanEmail].connections || [];
+    const existingIdx = connections.findIndex((c: any) => c.platform === platformKey);
+    const newConn = {
+      platform: platformKey,
       connected: true,
-      accountId: chosenOpt.id,
       name: chosenOpt.name,
+      accountId: chosenOpt.id,
       avatar: chosenOpt.avatar || "",
-      accessToken: chosenOpt.accessToken || "",
+      accessToken: encryptedToken,
       category: chosenOpt.category || "Facebook Page",
       instagram: chosenOpt.instagramBusinessAccount || null,
       connectedAt: new Date().toISOString()
     };
-    saveDbState(dbState);
-    console.log(`[META OAUTH AUTO-CONNECT SUCCESS] Connected account "${chosenOpt.name}" (ID: ${chosenOpt.id}) saved to user state for ${email}`);
+    if (existingIdx >= 0) {
+      connections[existingIdx] = newConn;
+    } else {
+      connections.push(newConn);
+    }
+    userSocialConnections[cleanEmail].connections = connections;
+
+    console.log(`[META OAUTH AUTO-CONNECT SUCCESS] Connected account "${chosenOpt.name}" (ID: ${chosenOpt.id}) saved to user state and social store for ${cleanEmail}`);
   }
 
   // Sanitize assets list so we don't expose active tokens to the client DOM
