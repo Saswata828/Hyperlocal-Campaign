@@ -439,7 +439,31 @@
   },
   "userSocialConnections": {
     "saswatamishra828@gmail.com": null,
-    "merchant@hyperlocal.ai": null,
+    "merchant@hyperlocal.ai": {
+      "connections": [
+        {
+          "platform": "facebook",
+          "connected": true,
+          "name": "Sandbox Identity",
+          "accountId": "111222333",
+          "connectedAt": "2026-08-25T14:50:59.236Z",
+          "accessToken": "mock-token-1787669459236"
+        },
+        {
+          "platform": "instagram",
+          "connected": false
+        },
+        {
+          "platform": "whatsapp",
+          "connected": false
+        },
+        {
+          "platform": "google",
+          "connected": false
+        }
+      ],
+      "credentials": {}
+    },
     "newmerchant@hyperlocal.ai": {
       "connections": [
         {
@@ -472,7 +496,32 @@
   },
   "userNotifications": {
     "saswatamishra828@gmail.com": [],
-    "merchant@hyperlocal.ai": [],
+    "merchant@hyperlocal.ai": [
+      {
+        "id": "notif-1787671308882-ygx7r",
+        "title": "Social Broadcast Failed",
+        "message": "Publish pipeline failed on one or more active channels: Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T15:21:48.828Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials.\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T15:21:48.829Z",
+        "type": "alert",
+        "timestamp": "2026-08-25T15:21:48.882Z",
+        "read": false
+      },
+      {
+        "id": "notif-1787669598294-hrnh1",
+        "title": "Social Broadcast Failed",
+        "message": "Publish pipeline failed on one or more active channels: Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T14:53:18.289Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials.\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T14:53:18.289Z",
+        "type": "alert",
+        "timestamp": "2026-08-25T14:53:18.294Z",
+        "read": false
+      },
+      {
+        "id": "notif-1787669459237-k34tc",
+        "title": "Linked Channel: FACEBOOK",
+        "message": "Account \"undefined\" successfully linked via Sandbox authorization handshake. Ready to schedule posts.",
+        "type": "success",
+        "timestamp": "2026-08-25T14:50:59.237Z",
+        "read": false
+      }
+    ],
     "newmerchant@hyperlocal.ai": [
       {
         "id": "notif-1784471281768-1pnge",
@@ -548,6 +597,95 @@
         "campaignName": "Holi Organic Colors Carnival",
         "merchantEmail": "saswatamishra828@gmail.com",
         "merchantName": "saswatamishra828",
+        "platform": "whatsapp",
+        "publishDate": "2026-03-12",
+        "publishTime": "10:15:30",
+        "status": "FAILED",
+        "postId": "N/A",
+        "errorMessage": "WhatsApp Cloud API: Authentication failed. Invalid System User token.",
+        "caption": "🎨 Splash of comfort! Get premium footwear at flat 20% off. Shop now!",
+        "bannerUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&h=500&fit=crop&q=80"
+      }
+    ],
+    "merchant@hyperlocal.ai": [
+      {
+        "id": "hist-1787671308880-2tcd",
+        "campaignId": "test-camp-fix-001",
+        "campaignName": "Immediate Broadcast",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "facebook",
+        "publishDate": "2026-08-25",
+        "publishTime": "20:51:48",
+        "status": "FAILED",
+        "postId": "N/A",
+        "errorMessage": "Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T15:21:48.828Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials.\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T15:21:48.829Z",
+        "caption": "Visit our store this weekend and grab the best deals in town!",
+        "bannerUrl": "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800"
+      },
+      {
+        "id": "hist-1787669598293-pe5b",
+        "campaignId": "test-camp-001",
+        "campaignName": "Immediate Broadcast",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "facebook",
+        "publishDate": "2026-08-25",
+        "publishTime": "20:23:18",
+        "status": "FAILED",
+        "postId": "N/A",
+        "errorMessage": "Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T14:53:18.289Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials.\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T14:53:18.289Z",
+        "caption": "Visit our store this weekend and grab the best deals in town. Limited time offer for our neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800"
+      },
+      {
+        "id": "hist-seed-1",
+        "campaignId": "camp-1",
+        "campaignName": "Diwali Festive Sparkle Mega Drive",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "facebook",
+        "publishDate": "2025-11-10",
+        "publishTime": "18:00:00",
+        "status": "SUCCESS",
+        "postId": "fb-post-982347102",
+        "caption": "✨ Celebrate the festival of lights! Buy 2 outlets and claim a 3rd FREE. Offer valid for local neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-2",
+        "campaignId": "camp-1",
+        "campaignName": "Diwali Festive Sparkle Mega Drive",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "instagram",
+        "publishDate": "2025-11-10",
+        "publishTime": "18:00:05",
+        "status": "SUCCESS",
+        "postId": "ig-media-284729104",
+        "caption": "✨ Celebrate the festival of lights! Buy 2 outlets and claim a 3rd FREE. Offer valid for local neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-3",
+        "campaignId": "camp-2",
+        "campaignName": "Holi Organic Colors Carnival",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "instagram",
+        "publishDate": "2026-03-12",
+        "publishTime": "10:15:00",
+        "status": "SUCCESS",
+        "postId": "ig-media-394857201",
+        "caption": "🎨 Splash of comfort! Get premium footwear at flat 20% off. Shop now!",
+        "bannerUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&h=500&fit=crop&q=80"
+      },
+      {
+        "id": "hist-seed-4",
+        "campaignId": "camp-2",
+        "campaignName": "Holi Organic Colors Carnival",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
         "platform": "whatsapp",
         "publishDate": "2026-03-12",
         "publishTime": "10:15:30",
