@@ -151,9 +151,13 @@ export const ConnectedAccounts: React.FC = () => {
       const { type, platform, error } = event.data || {};
 
       if (type === 'OAUTH_AUTH_SUCCESS') {
+        console.log('[OAUTH DEBUG] Step A: OAUTH_AUTH_SUCCESS message received from origin:', event.origin, '| platform:', platform);
+
+        // Clear interval FIRST so the popup-closed polling cannot double-fire
         if (activePopupRef.current.timer) {
           clearInterval(activePopupRef.current.timer);
           activePopupRef.current.timer = null;
+          console.log('[OAUTH DEBUG] Step B: Popup polling interval cleared by message handler');
         }
         if (activePopupRef.current.window && !activePopupRef.current.window.closed) {
           activePopupRef.current.window.close();
@@ -161,15 +165,21 @@ export const ConnectedAccounts: React.FC = () => {
         }
 
         setActionLoading(null);
+        console.log('[OAUTH DEBUG] Step C: setActionLoading(null) called');
 
-        // Instantly refresh real social connections from backend
+        // Refresh real social connections from backend — use simple call, no setLoading
+        console.log('[OAUTH DEBUG] Step D: Calling apiService.getSocialConnections()');
         try {
           const freshData = await apiService.getSocialConnections();
+          console.log('[OAUTH DEBUG] Step E: getSocialConnections() resolved:', freshData);
           if (freshData && Array.isArray(freshData.connections)) {
             setConnections(freshData.connections);
+            console.log('[OAUTH DEBUG] Step F: setConnections() called with', freshData.connections.length, 'entries');
           }
-        } catch (e) {
-          await fetchConnections();
+        } catch (e: any) {
+          console.error('[OAUTH DEBUG] Step E-FAIL: getSocialConnections() threw:', e?.message);
+          // fetchConnections() sets loading=true internally; only call as last resort
+          fetchConnections();
         }
 
         const platformName = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Social';
@@ -299,12 +309,18 @@ export const ConnectedAccounts: React.FC = () => {
         const checkTimer = setInterval(() => {
           if (!popup || popup.closed) {
             clearInterval(checkTimer);
+            // Only take action if OAUTH_AUTH_SUCCESS message handler has NOT already
+            // cleared the timer. If it was already cleared, the message handler already
+            // handled state refresh — do not double-fire fetchConnections().
             if (activePopupRef.current.timer === checkTimer) {
+              console.log('[OAUTH DEBUG] Popup closed detected by interval (no message handler fired yet)');
               activePopupRef.current.timer = null;
               activePopupRef.current.window = null;
+              setActionLoading(null);
+              fetchConnections();
+            } else {
+              console.log('[OAUTH DEBUG] Popup closed detected by interval, but message handler already handled it — skipping duplicate refresh');
             }
-            setActionLoading(null);
-            fetchConnections();
           }
         }, 1000);
 
