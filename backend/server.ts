@@ -5679,6 +5679,12 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
               Close Window
             </button>
           </div>
+          <script>
+            // Immediately notify parent window of OAuth failure so it can clear loading state
+            if (window.opener) {
+              window.opener.postMessage({ type: "OAUTH_AUTH_FAILURE", platform: "${platform}", error: ${JSON.stringify(displayError)} }, "*");
+            }
+          </script>
         </body>
       </html>
     `);
