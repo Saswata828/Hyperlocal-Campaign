@@ -101,9 +101,11 @@ export const ConnectedAccounts: React.FC = () => {
   };
 
   const fetchConnections = async (isRetry = false) => {
+    console.log(`[LOADING DEBUG] fetchConnections(isRetry=${isRetry}) called — setting loading=true`);
     setLoading(true);
     try {
       const data = await apiService.getSocialConnections();
+      console.log('[LOADING DEBUG] fetchConnections: getSocialConnections() resolved, setting connections');
       if (data && Array.isArray(data.connections)) {
         setConnections(data.connections);
         if (data.credentials) {
@@ -121,7 +123,8 @@ export const ConnectedAccounts: React.FC = () => {
         ]);
       }
     } catch (err: any) {
-      console.error("Failed to load connections:", err);
+      const httpStatus = (err as any)?.response?.status ?? 'NO_RESPONSE';
+      console.error(`[LOADING DEBUG] fetchConnections(isRetry=${isRetry}) FAILED — HTTP ${httpStatus}:`, err?.message);
       if (!isRetry) {
         console.log("[COLD START RETRY] Retrying connections fetch in 2s for backend wakeup...");
         setTimeout(() => fetchConnections(true), 2000);
@@ -135,6 +138,7 @@ export const ConnectedAccounts: React.FC = () => {
         { platform: 'google', connected: false }
       ]);
     } finally {
+      console.log(`[LOADING DEBUG] fetchConnections(isRetry=${isRetry}) finally — setting loading=false`);
       setLoading(false);
     }
   };
@@ -168,18 +172,36 @@ export const ConnectedAccounts: React.FC = () => {
         console.log('[OAUTH DEBUG] Step C: setActionLoading(null) called');
 
         // Refresh real social connections from backend — use simple call, no setLoading
-        console.log('[OAUTH DEBUG] Step D: Calling apiService.getSocialConnections()');
+        console.log('[OAUTH DEBUG] Step D: Calling apiService.getSocialConnections(). Current loading state will NOT be touched.');
         try {
           const freshData = await apiService.getSocialConnections();
-          console.log('[OAUTH DEBUG] Step E: getSocialConnections() resolved:', freshData);
+          console.log('[OAUTH DEBUG] Step E: getSocialConnections() resolved:', JSON.stringify(freshData)?.slice(0, 200));
           if (freshData && Array.isArray(freshData.connections)) {
             setConnections(freshData.connections);
             console.log('[OAUTH DEBUG] Step F: setConnections() called with', freshData.connections.length, 'entries');
+          } else {
+            console.warn('[OAUTH DEBUG] Step E-WARN: freshData.connections is not an array:', freshData);
           }
         } catch (e: any) {
-          console.error('[OAUTH DEBUG] Step E-FAIL: getSocialConnections() threw:', e?.message);
-          // fetchConnections() sets loading=true internally; only call as last resort
-          fetchConnections();
+          const httpStatus = (e as any)?.response?.status ?? 'NO_RESPONSE';
+          console.error(`[OAUTH DEBUG] Step E-FAIL: getSocialConnections() threw HTTP ${httpStatus}:`, e?.message);
+          // IMPORTANT: Do NOT call fetchConnections() here — it sets loading=true and enters a
+          // retry cycle which causes the spinner to re-appear after OAuth completion.
+          // The backend already saved the connection during the OAuth callback.
+          // Instead, schedule a single silent retry after 3 seconds without touching loading state.
+          console.log('[OAUTH DEBUG] Step E-RETRY: Scheduling silent retry in 3s without loading spinner...');
+          setTimeout(async () => {
+            try {
+              const retryData = await apiService.getSocialConnections();
+              console.log('[OAUTH DEBUG] Step E-RETRY-OK: Silent retry resolved:', retryData?.connections?.length, 'connections');
+              if (retryData && Array.isArray(retryData.connections)) {
+                setConnections(retryData.connections);
+              }
+            } catch (retryErr: any) {
+              console.error('[OAUTH DEBUG] Step E-RETRY-FAIL: Silent retry also failed:', retryErr?.message);
+              // Give up silently — backend connection was already saved; user can refresh manually
+            }
+          }, 3000);
         }
 
         const platformName = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Social';

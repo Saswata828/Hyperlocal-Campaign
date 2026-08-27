@@ -444,10 +444,10 @@
         {
           "platform": "facebook",
           "connected": true,
-          "name": "Sandbox Identity",
-          "accountId": "111222333",
-          "connectedAt": "2026-08-25T14:50:59.236Z",
-          "accessToken": "mock-token-1787669459236"
+          "name": "Production FB Page",
+          "accountId": "123456789",
+          "connectedAt": "2026-08-25T15:41:40.701Z",
+          "accessToken": "ea9775228eaa11d95d02f543771836b2:3142199fa93dcaed134ad98bc0c4f094cdf4d739ba9997890da01b10f41eb64c"
         },
         {
           "platform": "instagram",
@@ -462,7 +462,10 @@
           "connected": false
         }
       ],
-      "credentials": {}
+      "credentials": {
+        "facebookPageId": "a7e422106779c8a6e8c07d953ffaf972:23c5a32393056410c5b270cef7835e8c",
+        "facebookAccessToken": "ea9775228eaa11d95d02f543771836b2:3142199fa93dcaed134ad98bc0c4f094cdf4d739ba9997890da01b10f41eb64c"
+      }
     },
     "newmerchant@hyperlocal.ai": {
       "connections": [
@@ -497,6 +500,22 @@
   "userNotifications": {
     "saswatamishra828@gmail.com": [],
     "merchant@hyperlocal.ai": [
+      {
+        "id": "notif-1787672502851-vgarz",
+        "title": "Social Broadcast Failed",
+        "message": "Publish pipeline failed on one or more active channels: Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T15:41:40.783Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API] Dispatching Page Post to ID a7e422106779c8a6e8c07d953ffaf972:23c5a32393056410c5b270cef7835e8c...\n[FACEBOOK API FAILURE] Graph API error: Malformed access token\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T15:41:42.850Z",
+        "type": "alert",
+        "timestamp": "2026-08-25T15:41:42.851Z",
+        "read": false
+      },
+      {
+        "id": "notif-1787672500701-srg82",
+        "title": "Key Ring Refreshed",
+        "message": "Production API Keys & secrets successfully updated and saved using CBC-256 cipher vaults.",
+        "type": "success",
+        "timestamp": "2026-08-25T15:41:40.702Z",
+        "read": false
+      },
       {
         "id": "notif-1787671308882-ygx7r",
         "title": "Social Broadcast Failed",
@@ -608,6 +627,21 @@
       }
     ],
     "merchant@hyperlocal.ai": [
+      {
+        "id": "hist-1787672502851-b0nf",
+        "campaignId": "test-camp-999",
+        "campaignName": "Immediate Broadcast",
+        "merchantEmail": "merchant@hyperlocal.ai",
+        "merchantName": "Jane Doe",
+        "platform": "facebook",
+        "publishDate": "2026-08-25",
+        "publishTime": "21:11:42",
+        "status": "FAILED",
+        "postId": "N/A",
+        "errorMessage": "Social Broadcast partial failure. Logs:\n[AUDIT TRAIL] Started publishing pipeline at 2026-08-25T15:41:40.783Z\n[AUDIT TRAIL] Processing platform \"facebook\"...\n[FACEBOOK API] Dispatching Page Post to ID a7e422106779c8a6e8c07d953ffaf972:23c5a32393056410c5b270cef7835e8c...\n[FACEBOOK API FAILURE] Graph API error: Malformed access token\n[AUDIT TRAIL] Publishing transaction finalized at 2026-08-25T15:41:42.850Z",
+        "caption": "Visit our store this weekend - biggest sale of the year for local neighbors!",
+        "bannerUrl": "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800"
+      },
       {
         "id": "hist-1787671308880-2tcd",
         "campaignId": "test-camp-fix-001",
