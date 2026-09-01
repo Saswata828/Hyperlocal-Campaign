@@ -4823,7 +4823,7 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   }
 
   let providerUrl = "";
-  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "1058245473731313";
+  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "";
   const requestedFlow = (platform === "facebook" || platform === "instagram" || platform === "whatsapp") && configId ? "Facebook Login for Business" : "Standard OAuth";
 
   if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
