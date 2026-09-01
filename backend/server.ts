@@ -4249,10 +4249,22 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
       if (fbPageId && fbToken && !fbToken.startsWith("mock-")) {
         try {
           auditLogs.push(`[FACEBOOK API] Dispatching Page Post to ID ${fbPageId}...`);
-          const response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, {
-            message: `${campaign.generatedHeadline || ""}\n\n${campaign.generatedCaption || ""}\n\n${(campaign.generatedHashtags || []).join(" ")}`,
-            link: campaign.bannerUrl || ""
-          }, {
+          
+          const messageContent = [
+            campaign.generatedHeadline || campaign.headline,
+            campaign.generatedCaption || campaign.caption,
+            (campaign.generatedHashtags || []).join(" ")
+          ].filter(Boolean).join("\n\n").trim() || "New updates from our local store!";
+
+          const postPayload: any = {
+            message: messageContent
+          };
+
+          if (campaign.bannerUrl && typeof campaign.bannerUrl === "string" && campaign.bannerUrl.startsWith("http") && !campaign.bannerUrl.includes("localhost") && !campaign.bannerUrl.startsWith("data:")) {
+            postPayload.link = campaign.bannerUrl;
+          }
+
+          const response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, postPayload, {
             headers: { Authorization: `Bearer ${fbToken}` }
           });
           auditLogs.push(`[FACEBOOK API] Post successfully dispatched. FB Post ID: ${response.data.id}`);
@@ -4832,8 +4844,10 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
     } else {
       if (platform === "whatsapp") {
         providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
+      } else if (platform === "instagram") {
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic&state=${encodeURIComponent(state)}`;
       } else {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,pages_read_user_content,pages_manage_metadata,business_management,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
+        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
       }
     }
   } else if (platform === "google") {
@@ -6153,10 +6167,10 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
     return res.status(400).json({ success: false, error: "Validation Error: Ad caption must be at least 5 characters long." });
   }
 
-  // 3. Validate poster
-  if (!finalBannerUrl || typeof finalBannerUrl !== "string" || !finalBannerUrl.startsWith("http")) {
-    return res.status(400).json({ success: false, error: "Validation Error: A valid campaign poster image URL is required." });
-  }
+  // 3. Validate poster with fallback
+  const resolvedBannerUrl = (finalBannerUrl && typeof finalBannerUrl === "string" && (finalBannerUrl.startsWith("http") || finalBannerUrl.startsWith("data:"))) 
+    ? finalBannerUrl 
+    : "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
 
   if (!campaign) {
     // If not found, spawn a temporal draft campaign
