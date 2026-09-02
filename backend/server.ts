@@ -5839,17 +5839,36 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         </div>
 
         <div class="bg-white border-t border-slate-100 p-4">
-          <button onclick="window.close()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer">
-            Close Window
+          <button onclick="notifyAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer shadow-sm">
+            ✓ Done — Close Window
           </button>
         </div>
 
         <script>
-          if (window.opener) {
-            window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
+          function notifyAndClose() {
+            try {
+              if (window.opener) {
+                window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
+              }
+            } catch(e) {}
+            try {
+              if ('BroadcastChannel' in window) {
+                const bc = new BroadcastChannel("oauth_channel");
+                bc.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" });
+                bc.close();
+              }
+            } catch(e) {}
+            try { window.close(); } catch(e) {}
           }
+
+          // Automatically notify opener & broadcast channel immediately
+          notifyAndClose();
+
+          // Auto-close after 1 second
           setTimeout(function() {
-            window.close();
+            try {
+              window.close();
+            } catch(e) {}
           }, 1000);
 
           function selectAsset(id, nameDec, avatar) {
