@@ -4905,9 +4905,7 @@ app.get("/api/social/debug-status", (req: any, res) => {
       databaseConnectionStatus: isConnectedInDb 
         ? `Connected in DB (Page: ${fbConnInDb?.name || "Linked Page"}, ID: ${fbConnInDb?.accountId || "N/A"})` 
         : "Not Connected in Database",
-      lastErrorMessage: audit.lastErrorMessage || null,
-      lastMetaError: audit.lastMetaError || null,
-      configIdUsed: audit.configIdUsed || process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "N/A",
+      configIdUsed: "NONE",
       timestamp: audit.timestamp || new Date().toISOString()
     }
   });
@@ -5651,7 +5649,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
     })),
     lastErrorMessage: errorMessage || null,
     lastMetaError: lastMetaErrorObj || null,
-    configIdUsed: process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "N/A",
+    configIdUsed: "NONE",
     activeToken: activeToken
   };
 
