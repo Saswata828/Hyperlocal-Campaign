@@ -4835,28 +4835,23 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
   }
 
   let providerUrl = "";
-  const configId = process.env.META_BUSINESS_LOGIN_CONFIG_ID || process.env.META_FACEBOOK_LOGIN_CONFIG_ID || META_BUSINESS_LOGIN_CONFIG_ID || "";
-  const requestedFlow = (platform === "facebook" || platform === "instagram" || platform === "whatsapp") && configId ? "Facebook Login for Business" : "Standard OAuth";
+  // Explicitly disable Business Login config_id for standard Facebook OAuth flow
+  const configIdUsed = "NONE";
 
-  if (platform === "facebook" || platform === "instagram" || platform === "whatsapp") {
-    if (configId) {
-      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&config_id=${configId}&response_type=code&state=${encodeURIComponent(state)}`;
-    } else {
-      if (platform === "whatsapp") {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
-      } else if (platform === "instagram") {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic&state=${encodeURIComponent(state)}`;
-      } else {
-        providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
-      }
-    }
+  if (platform === "facebook") {
+    providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
+  } else if (platform === "instagram") {
+    providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic&state=${encodeURIComponent(state)}`;
+  } else if (platform === "whatsapp") {
+    providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,whatsapp_business_management,whatsapp_business_messaging&state=${encodeURIComponent(state)}`;
   } else if (platform === "google") {
     providerUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID || "1234567"}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/business.manage&state=${encodeURIComponent(state)}`;
   }
 
-  // Safe backend logs without printing access tokens or secrets
-  console.log(`[OAUTH START] Platform: ${platform} | Redirect URI: ${redirectUri} | Configuration ID: ${configId || "N/A"} | Requested Flow: ${requestedFlow}`);
-  console.log(`[META OAUTH URL] Generated OAuth URL: ${providerUrl}`);
+  const hasConfigId = providerUrl.includes("config_id=");
+
+  // Temporary diagnostic log for Phase 5.3
+  console.log(`[META OAUTH CONFIG]\nappId: ${META_APP_ID}\nredirectUri: ${redirectUri}\nconfigIdUsed: ${configIdUsed}\ngenerated OAuth URL has config_id: ${hasConfigId}`);
 
   res.json({
     url: providerUrl,
