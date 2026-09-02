@@ -5061,7 +5061,8 @@ app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
 });
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
-  const { code, state } = req.query;
+  try {
+    const { code, state } = req.query;
   const redirectUri = getCanonicalRedirectUri(req, "/auth/social-callback");
 
   let verifiedState: any = null;
@@ -5705,11 +5706,10 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   if (email && options.length > 0) {
     const chosenOpt = options[0];
     const platformKey = platform.toLowerCase();
-    const cleanEmail = email.toLowerCase().trim();
-
-    if (dbState.users && dbState.users[cleanEmail]) {
-      dbState.users[cleanEmail].connectedAccounts = dbState.users[cleanEmail].connectedAccounts || {};
-      dbState.users[cleanEmail].connectedAccounts[platformKey] = {
+    const matchedUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
+    if (matchedUser) {
+      matchedUser.connectedAccounts = matchedUser.connectedAccounts || {};
+      matchedUser.connectedAccounts[platformKey] = {
         connected: true,
         accountId: chosenOpt.id,
         name: chosenOpt.name,
@@ -5719,7 +5719,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         instagram: chosenOpt.instagramBusinessAccount || null,
         connectedAt: new Date().toISOString()
       };
-      saveDbState(dbState);
+      saveDbState(cleanEmail);
     }
 
     if (!userSocialConnections[cleanEmail]) {
@@ -5879,6 +5879,32 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
       </body>
     </html>
   `);
+  } catch (fatalCallbackErr: any) {
+    console.error("[FATAL OAUTH CALLBACK ERROR]", fatalCallbackErr);
+    return res.send(`
+      <html>
+        <head>
+          <title>Authentication Notice</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
+          <div class="bg-white border border-rose-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
+            <h1 class="text-sm font-black text-slate-900">Authentication Error</h1>
+            <p class="text-xs text-slate-600">${fatalCallbackErr.message || 'An unexpected error occurred during authorization.'}</p>
+            <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_FAILURE',platform:'facebook'},'*');} window.close();" class="w-full bg-slate-900 text-white text-xs font-black py-2.5 rounded-xl shadow cursor-pointer">
+              Close Window
+            </button>
+          </div>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'OAUTH_AUTH_FAILURE', platform: 'facebook', error: ${JSON.stringify(fatalCallbackErr.message || 'Fatal OAuth error')} }, '*');
+            }
+            setTimeout(function() { window.close(); }, 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  }
 });
 
 app.post("/api/social/connect-selected", authGuard, async (req: any, res) => {
