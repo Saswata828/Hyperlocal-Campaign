@@ -5061,8 +5061,7 @@ app.all("/api/social/test-page-direct", authGuard, async (req: any, res) => {
 });
 
 app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, res) => {
-  try {
-    const { code, state } = req.query;
+  const { code, state } = req.query;
   const redirectUri = getCanonicalRedirectUri(req, "/auth/social-callback");
 
   let verifiedState: any = null;
@@ -5706,10 +5705,11 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
   if (email && options.length > 0) {
     const chosenOpt = options[0];
     const platformKey = platform.toLowerCase();
-    const matchedUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
-    if (matchedUser) {
-      matchedUser.connectedAccounts = matchedUser.connectedAccounts || {};
-      matchedUser.connectedAccounts[platformKey] = {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (dbState.users && dbState.users[cleanEmail]) {
+      dbState.users[cleanEmail].connectedAccounts = dbState.users[cleanEmail].connectedAccounts || {};
+      dbState.users[cleanEmail].connectedAccounts[platformKey] = {
         connected: true,
         accountId: chosenOpt.id,
         name: chosenOpt.name,
@@ -5719,7 +5719,7 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         instagram: chosenOpt.instagramBusinessAccount || null,
         connectedAt: new Date().toISOString()
       };
-      saveDbState(cleanEmail);
+      saveDbState(dbState);
     }
 
     if (!userSocialConnections[cleanEmail]) {
@@ -5839,36 +5839,17 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
         </div>
 
         <div class="bg-white border-t border-slate-100 p-4">
-          <button onclick="notifyAndClose()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer shadow-sm">
-            ✓ Done — Close Window
+          <button onclick="window.close()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black py-3 rounded-2xl transition-colors cursor-pointer">
+            Close Window
           </button>
         </div>
 
         <script>
-          function notifyAndClose() {
-            try {
-              if (window.opener) {
-                window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
-              }
-            } catch(e) {}
-            try {
-              if ('BroadcastChannel' in window) {
-                const bc = new BroadcastChannel("oauth_channel");
-                bc.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" });
-                bc.close();
-              }
-            } catch(e) {}
-            try { window.close(); } catch(e) {}
+          if (window.opener) {
+            window.opener.postMessage({ type: "OAUTH_AUTH_SUCCESS", platform: "${platform}" }, "*");
           }
-
-          // Automatically notify opener & broadcast channel immediately
-          notifyAndClose();
-
-          // Auto-close after 1 second
           setTimeout(function() {
-            try {
-              window.close();
-            } catch(e) {}
+            window.close();
           }, 1000);
 
           function selectAsset(id, nameDec, avatar) {
@@ -5898,32 +5879,6 @@ app.get(["/auth/social-callback", "/auth/social-callback/"], async (req: any, re
       </body>
     </html>
   `);
-  } catch (fatalCallbackErr: any) {
-    console.error("[FATAL OAUTH CALLBACK ERROR]", fatalCallbackErr);
-    return res.send(`
-      <html>
-        <head>
-          <title>Authentication Notice</title>
-          <script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6 text-center">
-          <div class="bg-white border border-rose-200 rounded-3xl p-8 max-w-md shadow-sm space-y-4">
-            <h1 class="text-sm font-black text-slate-900">Authentication Error</h1>
-            <p class="text-xs text-slate-600">${fatalCallbackErr.message || 'An unexpected error occurred during authorization.'}</p>
-            <button onclick="if(window.opener){window.opener.postMessage({type:'OAUTH_AUTH_FAILURE',platform:'facebook'},'*');} window.close();" class="w-full bg-slate-900 text-white text-xs font-black py-2.5 rounded-xl shadow cursor-pointer">
-              Close Window
-            </button>
-          </div>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'OAUTH_AUTH_FAILURE', platform: 'facebook', error: ${JSON.stringify(fatalCallbackErr.message || 'Fatal OAuth error')} }, '*');
-            }
-            setTimeout(function() { window.close(); }, 2000);
-          </script>
-        </body>
-      </html>
-    `);
-  }
 });
 
 app.post("/api/social/connect-selected", authGuard, async (req: any, res) => {

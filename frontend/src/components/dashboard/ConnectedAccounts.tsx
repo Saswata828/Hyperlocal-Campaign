@@ -233,17 +233,6 @@ export const ConnectedAccounts: React.FC = () => {
 
     window.addEventListener('message', handleOAuthMessage);
 
-    let bc: BroadcastChannel | null = null;
-    try {
-      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        bc = new BroadcastChannel('oauth_channel');
-        bc.onmessage = (event: MessageEvent) => {
-          console.log('[OAUTH BROADCAST] Received message on BroadcastChannel:', event.data);
-          handleOAuthMessage(event);
-        };
-      }
-    } catch (e) {}
-
     // Expose global checkLoginState for Meta login button callbacks
     (window as any).checkLoginState = () => {
       if (typeof window !== 'undefined' && (window as any).FB) {
@@ -293,9 +282,6 @@ export const ConnectedAccounts: React.FC = () => {
 
     return () => {
       window.removeEventListener('message', handleOAuthMessage);
-      if (bc) {
-        try { bc.close(); } catch (e) {}
-      }
       if (activePopupRef.current.timer) {
         clearInterval(activePopupRef.current.timer);
       }
@@ -342,36 +328,12 @@ export const ConnectedAccounts: React.FC = () => {
         }
         activePopupRef.current.window = popup;
 
-        let pollCount = 0;
-        const checkTimer = setInterval(async () => {
-          pollCount++;
-
-          // Every 2s, check if the backend has successfully connected the platform
-          if (pollCount % 2 === 0) {
-            try {
-              const checkData = await apiService.getSocialConnections();
-              const isNowConnected = checkData?.connections?.some(
-                (c: any) => c.platform === platform && c.connected
-              );
-              if (isNowConnected) {
-                console.log(`[OAUTH AUTO-CLOSE] Detected ${platform} connected on backend! Closing popup...`);
-                clearInterval(checkTimer);
-                if (popup && !popup.closed) {
-                  try { popup.close(); } catch (e) {}
-                }
-                activePopupRef.current.timer = null;
-                activePopupRef.current.window = null;
-                setActionLoading(null);
-                setConnections(checkData.connections);
-                const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
-                showAlert('success', `${platformName} account connected successfully!`);
-                return;
-              }
-            } catch (e) {}
-          }
-
+        const checkTimer = setInterval(() => {
           if (!popup || popup.closed) {
             clearInterval(checkTimer);
+            // Only take action if OAUTH_AUTH_SUCCESS message handler has NOT already
+            // cleared the timer. If it was already cleared, the message handler already
+            // handled state refresh — do not double-fire fetchConnections().
             if (activePopupRef.current.timer === checkTimer) {
               console.log('[OAUTH DEBUG] Popup closed detected by interval (no message handler fired yet)');
               activePopupRef.current.timer = null;
@@ -381,15 +343,6 @@ export const ConnectedAccounts: React.FC = () => {
             } else {
               console.log('[OAUTH DEBUG] Popup closed detected by interval, but message handler already handled it — skipping duplicate refresh');
             }
-          }
-
-          // Safety timeout after 45 seconds to ensure button does not buffer forever
-          if (pollCount > 45) {
-            clearInterval(checkTimer);
-            activePopupRef.current.timer = null;
-            activePopupRef.current.window = null;
-            setActionLoading(null);
-            fetchConnections();
           }
         }, 1000);
 
