@@ -878,7 +878,7 @@ export const SocialPublishing: React.FC = () => {
                               rel="noopener noreferrer" 
                               className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-indigo-200 transition-colors font-bold text-[10px]"
                             >
-                              View on Facebook <ExternalLink className="h-3 w-3" />
+                              View on {platform.charAt(0).toUpperCase() + platform.slice(1)} <ExternalLink className="h-3 w-3" />
                             </a>
                           )}
                         </div>
