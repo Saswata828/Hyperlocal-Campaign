@@ -344,8 +344,9 @@ async function getUserFromFirestore(email: string): Promise<any | null> {
   }
 }
 
-// Enable JSON bodies
-app.use(express.json());
+// Enable JSON bodies with 50MB limit to support base64 generated graphic posters
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // IN-MEMORY DATA STORE WITH REASONABLE SYSTEM SEEDS
 let mockUsers: any[] = [
@@ -4231,6 +4232,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
   const activePlatforms = campaign.platforms || [];
 
   const auditLogs: string[] = [];
+  const channelResults: Record<string, any> = {};
   let publishSucceeded = true;
 
   auditLogs.push(`[AUDIT TRAIL] Started publishing pipeline at ${new Date().toISOString()}`);
@@ -4242,9 +4244,10 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
     auditLogs.push(`[AUDIT TRAIL] Processing platform "${plat}"...`);
 
     if (pLower === "facebook") {
-      const fbPageId = creds.facebookPageId || (conn && conn.accountId);
-      const rawToken = creds.facebookAccessToken || (conn && conn.accessToken);
-      const fbToken = decryptToken(rawToken);
+      const rawPageId = creds.facebookPageId || (conn && conn.accountId) || "";
+      const fbPageId = decryptToken(rawPageId).trim();
+      const rawToken = creds.facebookAccessToken || (conn && conn.accessToken) || "";
+      const fbToken = decryptToken(rawToken).trim();
 
       if (fbPageId && fbToken && !fbToken.startsWith("mock-")) {
         try {
@@ -4256,34 +4259,104 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
             (campaign.generatedHashtags || []).join(" ")
           ].filter(Boolean).join("\n\n").trim() || "New updates from our local store!";
 
-          const postPayload: any = {
-            message: messageContent
-          };
+          const isBase64 = campaign.bannerUrl && typeof campaign.bannerUrl === "string" && campaign.bannerUrl.startsWith("data:image");
+          const isHttpImage = campaign.bannerUrl && typeof campaign.bannerUrl === "string" && campaign.bannerUrl.startsWith("http") && !campaign.bannerUrl.includes("localhost");
 
-          if (campaign.bannerUrl && typeof campaign.bannerUrl === "string" && campaign.bannerUrl.startsWith("http") && !campaign.bannerUrl.includes("localhost") && !campaign.bannerUrl.startsWith("data:")) {
-            postPayload.link = campaign.bannerUrl;
+          let response: any;
+
+          if (isHttpImage) {
+            // Post via /photos endpoint: Works for any HTTP image URL
+            try {
+              auditLogs.push(`[FACEBOOK API] Publishing photo post to /photos via URL...`);
+              response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/photos`, {
+                url: campaign.bannerUrl,
+                caption: messageContent,
+                access_token: fbToken,
+                published: true
+              });
+            } catch (photoErr: any) {
+              auditLogs.push(`[FACEBOOK API] Photo URL publish failed (${photoErr.response?.data?.error?.message || photoErr.message}). Falling back to text feed...`);
+              response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, {
+                message: messageContent,
+                access_token: fbToken
+              });
+            }
+          } else if (isBase64) {
+            // Upload Base64 image directly to Meta as binary source via native fetch
+            try {
+              auditLogs.push(`[FACEBOOK API] Uploading graphic creative poster binary to /photos...`);
+              const mimeMatch = campaign.bannerUrl.match(/^data:(image\/\w+);base64,/);
+              const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+              const rawBase64 = campaign.bannerUrl.replace(/^data:image\/\w+;base64,/, "");
+              const buffer = Buffer.from(rawBase64, "base64");
+
+              const form = new FormData();
+              const filename = mimeType === "image/png" ? "poster.png" : "poster.jpg";
+              const file = new File([buffer], filename, { type: mimeType });
+              form.append("source", file);
+              form.append("caption", messageContent);
+              form.append("published", "true");
+
+              // Send multipart FormData with access_token in URL query param for Meta auth verification
+              const fbPhotoRes = await fetch(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/photos?access_token=${encodeURIComponent(fbToken)}`, {
+                method: "POST",
+                body: form
+              });
+
+              const photoData = await fbPhotoRes.json();
+
+              if (!fbPhotoRes.ok || photoData.error) {
+                const pErr = photoData.error?.message || `HTTP ${fbPhotoRes.status}`;
+                throw new Error(pErr);
+              }
+
+              response = { data: photoData };
+              auditLogs.push(`[FACEBOOK API] Photo successfully uploaded and published to feed! Photo ID: ${photoData.id || photoData.post_id}`);
+            } catch (b64Err: any) {
+              auditLogs.push(`[FACEBOOK API] Photo upload failed (${b64Err.message}). Falling back to text feed...`);
+              response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, {
+                message: messageContent,
+                access_token: fbToken
+              });
+            }
+          } else {
+            // Text feed post without image
+            response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, {
+              message: messageContent,
+              access_token: fbToken
+            });
           }
 
-          const response = await axios.post(`https://graph.facebook.com/${META_VERSION}/${fbPageId}/feed`, postPayload, {
-            headers: { Authorization: `Bearer ${fbToken}` }
-          });
-          auditLogs.push(`[FACEBOOK API] Post successfully dispatched. FB Post ID: ${response.data.id}`);
+          const livePostId = response.data.post_id || response.data.id;
+          const liveUrl = response.data.post_id 
+            ? `https://www.facebook.com/${response.data.post_id}` 
+            : `https://www.facebook.com/${fbPageId}/posts/${response.data.id}`;
+          channelResults.facebook = { status: "live", postId: livePostId, url: liveUrl };
+          auditLogs.push(`[FACEBOOK API] Post successfully dispatched. FB Post ID: ${livePostId} | URL: ${liveUrl}`);
         } catch (err: any) {
           publishSucceeded = false;
-          const errMsg = err.response?.data?.error?.message || err.message;
-          auditLogs.push(`[FACEBOOK API FAILURE] Graph API error: ${errMsg}`);
+          const metaError = err.response?.data?.error;
+          let detail = "";
+          if (metaError) {
+            detail = `[Code ${metaError.code}${metaError.error_subcode ? ` Subcode ${metaError.error_subcode}` : ""}] ${metaError.message}`;
+            if (metaError.error_user_title) detail += ` | ${metaError.error_user_title}: ${metaError.error_user_msg}`;
+          } else {
+            detail = err.message;
+          }
+          auditLogs.push(`[FACEBOOK API FAILURE] Target Page ID: ${fbPageId} | Token: ${fbToken ? `${fbToken.substring(0, 10)}...` : 'MISSING'} | Error: ${detail}`);
         }
       } else {
         publishSucceeded = false;
-        auditLogs.push(`[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials.`);
+        auditLogs.push(`[FACEBOOK API FAILURE] Facebook Page not connected or invalid OAuth credentials. (fbPageId: ${fbPageId || 'MISSING'}, hasToken: ${!!fbToken}, isMock: ${fbToken ? fbToken.startsWith("mock-") : false})`);
       }
     }
 
     // INSTAGRAM BUSINESS PUBLISHING
     else if (pLower === "instagram") {
-      const igBusinessId = creds.instagramBusinessId || (conn && conn.accountId);
-      const rawToken = creds.facebookAccessToken || (conn && conn.accessToken);
-      const fbToken = decryptToken(rawToken);
+      const rawIgId = creds.instagramBusinessId || (conn && conn.accountId) || "";
+      const igBusinessId = decryptToken(rawIgId).trim();
+      const rawToken = creds.facebookAccessToken || (conn && conn.accessToken) || "";
+      const fbToken = decryptToken(rawToken).trim();
 
       if (igBusinessId && fbToken && !fbToken.startsWith("mock-")) {
         try {
@@ -4342,9 +4415,10 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
 
     // WHATSAPP BUSINESS PLATFORM CLOUD API
     else if (pLower === "whatsapp" || pLower === "whatsapp business") {
-      const phoneId = creds.whatsappPhoneId || (conn && conn.accountId);
-      const rawToken = creds.whatsappAccessToken || (conn && conn.accessToken);
-      const waToken = decryptToken(rawToken);
+      const rawPhoneId = creds.whatsappPhoneId || (conn && conn.accountId) || "";
+      const phoneId = decryptToken(rawPhoneId).trim();
+      const rawToken = creds.whatsappAccessToken || (conn && conn.accessToken) || "";
+      const waToken = decryptToken(rawToken).trim();
 
       if (phoneId && waToken && !waToken.startsWith("mock-")) {
         try {
@@ -4467,9 +4541,10 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
 
     // GOOGLE MY BUSINESS PROFILE
     else if (pLower === "google" || pLower === "google business profile") {
-      const locationId = creds.googleLocationId || (conn && conn.accountId);
-      const rawToken = creds.googleAccessToken || (conn && conn.accessToken);
-      let googleToken = decryptToken(rawToken);
+      const rawLocId = creds.googleLocationId || (conn && conn.accountId) || "";
+      const locationId = decryptToken(rawLocId).trim();
+      const rawToken = creds.googleAccessToken || (conn && conn.accessToken) || "";
+      let googleToken = decryptToken(rawToken).trim();
 
       if (locationId && googleToken && !googleToken.startsWith("mock-")) {
         try {
@@ -4574,6 +4649,7 @@ async function executePublishCampaign(email: string, campaign: any): Promise<any
   return {
     success: true,
     logs: auditLogs,
+    results: channelResults,
     metrics: {
       reach: Math.round((campaign.budget || 2000) * 5.4),
       engagement: Math.round((campaign.budget || 2000) * 1.8),
@@ -4834,12 +4910,16 @@ app.get("/api/social/oauth-url", authGuard, (req: any, res) => {
     });
   }
 
-  let providerUrl = "";
-  // Explicitly disable Business Login config_id for standard Facebook OAuth flow
-  const configIdUsed = "NONE";
+  let configIdUsed = META_BUSINESS_LOGIN_CONFIG_ID || "NONE";
 
   if (platform === "facebook") {
-    providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
+    if (configIdUsed !== "NONE") {
+      // Business Login requires config_id and STRICTLY FORBIDS the scope parameter (scopes are set in the Meta Dashboard)
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&config_id=${configIdUsed}&state=${encodeURIComponent(state)}`;
+    } else {
+      // Standard login
+      providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts&state=${encodeURIComponent(state)}`;
+    }
   } else if (platform === "instagram") {
     providerUrl = `https://www.facebook.com/${META_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic&state=${encodeURIComponent(state)}`;
   } else if (platform === "whatsapp") {
@@ -6032,12 +6112,13 @@ app.post("/api/social/connect-direct", authGuard, (req: any, res) => {
     userSocialConnections[email] = { connections: [], credentials: {} };
   }
 
-  // Encrypt the sensitive tokens before saving in state
+  // Encrypt the sensitive tokens before saving in state (keep public IDs plain)
   const encryptedCreds: any = {};
   Object.keys(config).forEach(key => {
     const val = config[key];
+    const isSecret = key.toLowerCase().includes("token") || key.toLowerCase().includes("secret") || key.toLowerCase().includes("password");
     if (val && !val.includes("••••")) {
-      encryptedCreds[key] = encryptToken(val);
+      encryptedCreds[key] = isSecret ? encryptToken(val) : val;
     } else if (val) {
       // Keep old/masked token as is if it was unchanged
       encryptedCreds[key] = userSocialConnections[email].credentials[key] || "";
@@ -6173,7 +6254,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
       generatedHeadline: headline || "Promo Alert",
       generatedCaption: caption || "Check our boutique deals!",
       platforms: platforms || ["facebook"],
-      bannerUrl: bannerUrl || "",
+      bannerUrl: resolvedBannerUrl,
       budget: 1000
     };
   } else {
@@ -6181,7 +6262,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
     campaign.generatedCaption = caption || campaign.generatedCaption;
     campaign.generatedHeadline = headline || campaign.generatedHeadline;
     campaign.platforms = platforms || campaign.platforms;
-    campaign.bannerUrl = bannerUrl || campaign.bannerUrl;
+    campaign.bannerUrl = resolvedBannerUrl;
   }
 
   try {
@@ -6212,7 +6293,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
         publishDate: pubDate,
         publishTime: pubTime,
         status: "SUCCESS",
-        postId: `${plat.toLowerCase() === 'google' ? 'gbp' : plat.toLowerCase().substring(0, 2)}-post-${Math.floor(Math.random() * 100000000)}`,
+        postId: result.results?.[plat.toLowerCase()]?.postId || `${plat.toLowerCase() === 'google' ? 'gbp' : plat.toLowerCase().substring(0, 2)}-post-${Math.floor(Math.random() * 100000000)}`,
         caption: caption || campaign.generatedCaption || "",
         bannerUrl: bannerUrl || campaign.bannerUrl || ""
       });
@@ -6225,7 +6306,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
     });
 
     saveDbState();
-    res.json({ success: true, result });
+    res.json({ success: true, results: result.results || {}, result });
   } catch (err: any) {
     console.error("[SOCIAL BROADCAST ERROR]", err);
     campaign.status = "Draft"; // Revert to draft so they can edit and retry
@@ -6263,7 +6344,7 @@ app.post("/api/social/publish", authGuard, async (req: any, res) => {
     });
 
     saveDbState();
-    res.status(500).json({ success: false, error: err.message, logs: err.message });
+    res.status(500).json({ success: false, error: err.message, message: err.message, logs: err.message });
   }
 });
 

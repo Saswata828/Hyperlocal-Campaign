@@ -329,27 +329,49 @@ export const ConnectedAccounts: React.FC = () => {
         }
         activePopupRef.current.window = popup;
 
+        let elapsedSeconds = 0;
+        const maxWaitSeconds = 45;
+
         const checkTimer = setInterval(() => {
+          elapsedSeconds += 1;
+
+          // Check if popup closed by user or script
           if (!popup || popup.closed) {
             clearInterval(checkTimer);
-            // Only take action if OAUTH_AUTH_SUCCESS message handler has NOT already
-            // cleared the timer. If it was already cleared, the message handler already
-            // handled state refresh — do not double-fire fetchConnections().
             if (activePopupRef.current.timer === checkTimer) {
-              console.log('[OAUTH DEBUG] Popup closed detected by interval (no message handler fired yet)');
+              console.log('[OAUTH DEBUG] Popup closed detected by interval');
               activePopupRef.current.timer = null;
               activePopupRef.current.window = null;
               setActionLoading(null);
               fetchConnections();
-            } else {
-              console.log('[OAUTH DEBUG] Popup closed detected by interval, but message handler already handled it — skipping duplicate refresh');
+            }
+            return;
+          }
+
+          // Safety timeout: If Facebook gets stuck on blank/cancel page for 45 seconds
+          if (elapsedSeconds >= maxWaitSeconds) {
+            clearInterval(checkTimer);
+            if (activePopupRef.current.timer === checkTimer) {
+              activePopupRef.current.timer = null;
+              try {
+                if (activePopupRef.current.window && !activePopupRef.current.window.closed) {
+                  activePopupRef.current.window.close();
+                }
+              } catch (e) {}
+              activePopupRef.current.window = null;
+              setActionLoading(null);
+              showAlert('error', 'Facebook login timed out or halted. If you saw a blank page, check your Meta App redirect URI or use the Developer tab to link directly.');
             }
           }
         }, 1000);
 
         activePopupRef.current.timer = checkTimer;
+      } else {
+        if (popup) popup.close();
+        setActionLoading(null);
       }
     } catch (err: any) {
+      if (popup) popup.close();
       showAlert('error', err.message || 'Failed to initiate social connection.');
       setActionLoading(null);
     }

@@ -24,7 +24,8 @@ import {
   AlertCircle,
   Trash2,
   HelpCircle,
-  Globe
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -36,6 +37,39 @@ interface ScheduledPost {
   scheduledTime: string;
   status: 'PENDING' | 'PUBLISHED' | 'FAILED';
 }
+
+const compressBase64Image = (base64Str: string, maxDim = 1080, quality = 0.82): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64Str || !base64Str.startsWith('data:image')) {
+      return resolve(base64Str);
+    }
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => resolve(base64Str);
+    img.src = base64Str;
+  });
+};
 
 export const SocialPublishing: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = React.useState<'designer' | 'broadcasting'>('designer');
@@ -153,12 +187,17 @@ export const SocialPublishing: React.FC = () => {
     setPublishedResults(null);
 
     try {
+      let bannerPayload = imgUrl || currentProductImage;
+      if (bannerPayload && bannerPayload.startsWith('data:image') && bannerPayload.length > 200000) {
+        bannerPayload = await compressBase64Image(bannerPayload, 1080, 0.82);
+      }
+
       const data = await apiService.publishSocial({
         campaignId: `camp-pub-${Date.now()}`,
         caption,
         headline: posterHeadline,
         platforms: activeChannels,
-        bannerUrl: currentProductImage
+        bannerUrl: bannerPayload
       });
 
       if (data && data.success) {
@@ -169,7 +208,8 @@ export const SocialPublishing: React.FC = () => {
         setErrorLog(data?.error || data?.message || "Failed to publish campaign to selected channels.");
       }
     } catch (err: any) {
-      setErrorLog(err.response?.data?.message || err.message || "Failed to publish campaign to Meta APIs.");
+      const serverDetails = err.response?.data?.error || err.response?.data?.logs || err.response?.data?.message;
+      setErrorLog(serverDetails || err.message || "Failed to publish campaign to Meta APIs.");
     } finally {
       setIsPublishing(false);
     }
@@ -228,36 +268,31 @@ export const SocialPublishing: React.FC = () => {
     }
   };
 
+  const processFileToImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      if (event.target?.result) {
+        const rawStr = event.target.result as string;
+        const compressed = await compressBase64Image(rawStr, 1080, 0.82);
+        setUploadedImage(compressed);
+        setImgUrl(compressed); // Sync phone preview
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const resultStr = event.target.result as string;
-          setUploadedImage(resultStr);
-          setImgUrl(resultStr); // Sync phone preview
-        }
-      };
-      reader.readAsDataURL(file);
+      processFileToImage(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const resultStr = event.target.result as string;
-          setUploadedImage(resultStr);
-          setImgUrl(resultStr); // Sync phone preview
-        }
-      };
-      reader.readAsDataURL(file);
+      processFileToImage(e.target.files[0]);
     }
   };
 
@@ -801,19 +836,27 @@ export const SocialPublishing: React.FC = () => {
                   <input
                     type="text"
                     value={imgUrl}
-                    onChange={(e) => setImgUrl(e.target.value)}
+                    onChange={(e) => {
+                      setImgUrl(e.target.value);
+                      setUploadedImage(e.target.value);
+                    }}
                     className="w-full px-3.5 py-2 border border-slate-200 focus:ring-1 focus:ring-indigo-500 rounded-xl text-[11px] font-mono outline-none text-slate-600"
                   />
                 </div>
 
                 {/* ERROR FEEDBACK HUD */}
                 {errorLog && (
-                  <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs flex items-start gap-2.5">
-                    <AlertCircle className="h-4.5 w-4.5 text-rose-650 text-rose-600 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="font-extrabold">Detailed Error Logs:</strong>
-                      <p className="mt-0.5 font-semibold leading-normal">{errorLog}</p>
+                  <div className="bg-rose-50 border border-rose-200 text-rose-900 p-4 rounded-2xl text-xs space-y-2">
+                    <div className="flex items-center gap-2 text-rose-700">
+                      <AlertCircle className="h-5 w-5 shrink-0" />
+                      <strong className="font-extrabold text-sm">Meta Broadcast Error Diagnostics</strong>
                     </div>
+                    <p className="text-[11px] text-rose-600 font-semibold">
+                      Below is the exact response received from the Meta Graph API pipeline:
+                    </p>
+                    <pre className="font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap bg-white/80 p-3.5 rounded-xl border border-rose-200/80 text-rose-950 overflow-x-auto select-text shadow-xs">
+                      {errorLog}
+                    </pre>
                   </div>
                 )}
 
@@ -824,11 +867,21 @@ export const SocialPublishing: React.FC = () => {
                       <Check className="h-4.5 w-4.5 text-emerald-600" />
                       <strong className="text-xs font-black text-emerald-900">Synchronized Broadcaster Success Report!</strong>
                     </div>
-                    <div className="text-[10.5px] font-semibold text-emerald-800 space-y-1 pl-6">
+                    <div className="text-[10.5px] font-semibold text-emerald-800 space-y-1.5 pl-6">
                       {Object.keys(publishedResults).map(platform => (
-                        <p key={platform}>
-                          • <strong className="capitalize">{platform}</strong>: {publishedResults[platform]?.status === 'simulated' ? '✓ API Sandbox Verified Successful Delivery' : '✓ Live Posted successfully'} (ID: {publishedResults[platform]?.postId})
-                        </p>
+                        <div key={platform} className="flex items-center flex-wrap gap-2">
+                          <span>• <strong className="capitalize">{platform}</strong>: {publishedResults[platform]?.status === 'simulated' ? '✓ API Sandbox Verified Successful Delivery' : '✓ Live Posted successfully'} (ID: {publishedResults[platform]?.postId})</span>
+                          {publishedResults[platform]?.url && (
+                            <a 
+                              href={publishedResults[platform]?.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-indigo-200 transition-colors font-bold text-[10px]"
+                            >
+                              View on Facebook <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>

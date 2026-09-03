@@ -4,12 +4,20 @@ import axios from "axios";
 export const DEFAULT_PRODUCTION_BACKEND = "https://hyperlocal-campaign.onrender.com";
 
 export const API_BASE = (
-  (import.meta as any).env?.VITE_API_BASE_URL ||
-  ((import.meta as any).env?.VITE_BACKEND_URL ? `${(import.meta as any).env.VITE_BACKEND_URL}/api` : `${DEFAULT_PRODUCTION_BACKEND}/api`)
+  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "/api"
+    : ((import.meta as any).env?.VITE_API_BASE_URL ||
+       ((import.meta as any).env?.VITE_BACKEND_URL ? `${(import.meta as any).env.VITE_BACKEND_URL}/api` : `${DEFAULT_PRODUCTION_BACKEND}/api`))
 ).replace(/\/+$/, "");
 
 export const getApiUrl = (path: string): string => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  if (API_BASE === "/api") {
+    if (cleanPath === "/api" || cleanPath.startsWith("/api/")) {
+      return cleanPath;
+    }
+    return `/api${cleanPath}`;
+  }
   if (cleanPath === "/api" || cleanPath.startsWith("/api/")) {
     const subPath = cleanPath === "/api" ? "" : cleanPath.substring(4);
     return `${API_BASE}${subPath}`;
@@ -234,6 +242,10 @@ const saveEmulatedCurrentUser = (user: any) => {
 
 // --- API MODE REGULATION AND AUTOMATED SWITCHOVER ---
 const isEmulationActive = () => {
+  if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    localStorage.removeItem("__api_use_client_emulation");
+    return false;
+  }
   return localStorage.getItem("__api_use_client_emulation") === "true";
 };
 
@@ -1269,23 +1281,10 @@ export const apiService = {
   },
 
   async publishSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; bannerUrl?: string }) {
-    return runApi(
-      apiClient.post("/social/publish", payload).then(res => res.data),
-      async () => {
-        const results: Record<string, any> = {};
-        payload.platforms.forEach(p => {
-          results[p] = {
-            status: "simulated",
-            postId: "emu-post-" + Math.floor(Math.random() * 1000000)
-          };
-        });
-        return {
-          success: true,
-          message: "Campaign post published successfully across selected platforms!",
-          results
-        };
-      }
-    );
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("__api_use_client_emulation");
+    }
+    return apiClient.post("/social/publish", payload).then(res => res.data);
   },
 
   async scheduleSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; scheduledDate: string; bannerUrl?: string }) {
