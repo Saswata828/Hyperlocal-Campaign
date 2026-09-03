@@ -296,6 +296,15 @@ export const ConnectedAccounts: React.FC = () => {
   // Standard Popup-Based OAuth Flow
   const handleOAuthConnect = async (platform: string) => {
     setActionLoading(platform);
+
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    // Open popup synchronously immediately on click to prevent browser popup blockers
+    const popup = window.open('about:blank', `Connect ${platform}`, `width=${width},height=${height},left=${left},top=${top}`);
+
     try {
       // 1. Fetch OAuth URL from server
       const res = await fetch(getApiUrl(`/api/social/oauth-url?platform=${platform}`), {
@@ -304,24 +313,16 @@ export const ConnectedAccounts: React.FC = () => {
         }
       });
       if (!res.ok) {
+        if (popup) popup.close();
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Could not fetch OAuth URL');
       }
       const { url, isSandbox } = await res.json();
 
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-
       const targetUrl = isSandbox ? `/auth/social-sandbox?platform=${platform}` : url;
 
       if (targetUrl) {
-        const popup = window.open(
-          targetUrl,
-          `Connect ${platform}`,
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
+        if (popup) popup.location.href = targetUrl;
 
         if (activePopupRef.current.timer) {
           clearInterval(activePopupRef.current.timer);

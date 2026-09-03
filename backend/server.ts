@@ -138,12 +138,12 @@ function getCanonicalRedirectUri(req: any, fallbackPath: string = "/auth/social-
   const cleanHost = rawHost.replace(/^https?:\/\//, "").trim();
   const isLocal = cleanHost.includes("localhost") || cleanHost.includes("127.0.0.1") || cleanHost.includes("::1");
 
-  if (isLocal) {
-    return `http://${cleanHost}${fallbackPath}`.split("?")[0];
-  }
-
   if (META_REDIRECT_URI) {
     return META_REDIRECT_URI.split("?")[0];
+  }
+
+  if (isLocal) {
+    return `http://${cleanHost}${fallbackPath}`.split("?")[0];
   }
 
   const proto = (req?.protocol === "https" || req?.headers?.["x-forwarded-proto"] === "https") ? "https" : "https";
