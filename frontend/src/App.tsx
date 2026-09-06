@@ -5,6 +5,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import { MerchantDashboardLayout } from './components/dashboard/MerchantDashboardLayout';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { GoogleCallbackPage } from './components/auth/GoogleCallbackPage';
+import { GoogleMockChooserPage } from './components/auth/GoogleMockChooserPage';
 import { apiService } from './services/api';
 
 export default function App() {
@@ -20,10 +21,13 @@ export default function App() {
     return null;
   });
 
-  const [view, setView] = React.useState<'landing' | 'auth_screen' | 'dashboard' | 'google_callback'>(() => {
+  const [view, setView] = React.useState<'landing' | 'auth_screen' | 'dashboard' | 'google_callback' | 'google_mock'>(() => {
     const path = window.location.pathname;
     if (path === '/auth/google/callback' || path === '/auth/google/callback/') {
       return 'google_callback';
+    }
+    if (path === '/auth/google/mock' || path === '/auth/google/mock/') {
+      return 'google_mock';
     }
     // Vercel link / main domain always opens the Landing Page first
     return 'landing';
@@ -82,7 +86,9 @@ export default function App() {
   return (
     <div className="min-h-[100dvh] w-full bg-slate-50 flex flex-col font-sans selection:bg-indigo-500/10 selection:text-indigo-900" id="main-auth-container">
       <AnimatePresence mode="wait">
-        {view === 'google_callback' ? (
+        {view === 'google_mock' ? (
+          <GoogleMockChooserPage onSuccess={handleAuthSuccess} />
+        ) : view === 'google_callback' ? (
           <GoogleCallbackPage
             onSuccess={handleAuthSuccess}
             onCompleteProfileRequired={handleCompleteProfileRequired}

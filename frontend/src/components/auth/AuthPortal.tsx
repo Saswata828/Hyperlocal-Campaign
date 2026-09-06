@@ -89,8 +89,9 @@ export function AuthPortal({ initialMode = 'signin', onSuccess, onCancel, prefil
         return;
       }
       
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const { user, accessToken } = event.data;
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' || event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { user } = event.data;
+        const accessToken = event.data.accessToken || event.data.token;
         if (accessToken) {
           localStorage.setItem("_hyperlocal_access_token", accessToken);
         }
