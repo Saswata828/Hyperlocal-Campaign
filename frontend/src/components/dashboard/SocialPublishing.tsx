@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { apiService } from '../../services/api';
+import { dashboardService } from '../../services/dashboardService';
 import { 
   Instagram, 
   Facebook, 
@@ -119,6 +120,23 @@ export const SocialPublishing: React.FC = () => {
   const [dragActive, setDragActive] = React.useState(false);
   const [uploadedImage, setUploadedImage] = React.useState<string | null>(null);
 
+  // Physical Store & Hyperlocal Geofence Radius states
+  const [storeLocation, setStoreLocation] = React.useState('Bhubaneswar, Odisha');
+  const [storeCategory, setStoreCategory] = React.useState('Electronics & Gadgets');
+  const [radiusKm, setRadiusKm] = React.useState(24);
+  const [storeCoords, setStoreCoords] = React.useState<{ lat: number; lng: number }>({ lat: 20.238, lng: 85.723 });
+
+  // AI Guided Suggestions & Optimized Targeting engine state
+  const [aiTargeting, setAiTargeting] = React.useState<{
+    recommendedDemographics: string;
+    bestSchedulingTimes: string;
+    schedulingReason: string;
+    dialectSuggestion: string;
+    roiPredictor: string;
+    geofenceDeliveryPlan?: string;
+  } | null>(null);
+  const [loadingAiTargeting, setLoadingAiTargeting] = React.useState(false);
+
   // Load connection status and scheduled posts on mount
   const fetchConnectionsAndPosts = async () => {
     setLoadingConnections(true);
@@ -147,6 +165,37 @@ export const SocialPublishing: React.FC = () => {
         });
       }
 
+      // Synchronize primary store location and radius settings
+      const storeList = dashboardService.getStores();
+      let activeRad = 24;
+      let activeLoc = 'Bhubaneswar, Odisha';
+      let activeCat = 'Electronics & Gadgets';
+      let activeCoords = { lat: 20.238, lng: 85.723 };
+
+      if (storeList && storeList.length > 0) {
+        const primary = storeList[0];
+        if (primary.name) setBusinessName(primary.name);
+        if (primary.address) {
+          setStoreLocation(primary.address);
+          activeLoc = primary.address;
+        }
+        if (primary.category) {
+          setStoreCategory(primary.category);
+          activeCat = primary.category;
+        }
+        if (primary.radiusTargetKm) {
+          activeRad = Number(primary.radiusTargetKm);
+          setRadiusKm(activeRad);
+        }
+        if (primary.latitude && primary.longitude) {
+          activeCoords = { lat: Number(primary.latitude), lng: Number(primary.longitude) };
+          setStoreCoords(activeCoords);
+        }
+      }
+
+      // Automatically run AI Guided Suggestions targeting query
+      fetchAiTargeting(activeRad, activeLoc, activeCat, activeCoords);
+
       setLoadingScheduled(true);
       const campaigns = await apiService.getCampaigns();
       if (Array.isArray(campaigns)) {
@@ -174,6 +223,34 @@ export const SocialPublishing: React.FC = () => {
     fetchConnectionsAndPosts();
   }, []);
 
+  const fetchAiTargeting = async (
+    targetRadius = radiusKm,
+    targetLoc = storeLocation,
+    targetCat = storeCategory,
+    targetCoords = storeCoords
+  ) => {
+    setLoadingAiTargeting(true);
+    try {
+      const data = await apiService.getAiTargetingSuggestions({
+        storeLocation: targetLoc,
+        category: targetCat,
+        product: posterHeadline || "Special Festive Collection",
+        headline: posterHeadline,
+        radiusKm: targetRadius,
+        latitude: targetCoords.lat,
+        longitude: targetCoords.lng,
+        budget: 5000
+      });
+      if (data) {
+        setAiTargeting(data);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch AI targeting suggestions:", err);
+    } finally {
+      setLoadingAiTargeting(false);
+    }
+  };
+
   const handlePublishNow = async () => {
     const activeChannels = Object.keys(selectedChannels).filter(k => selectedChannels[k]);
     if (activeChannels.length === 0) {
@@ -197,12 +274,20 @@ export const SocialPublishing: React.FC = () => {
         caption,
         headline: posterHeadline,
         platforms: activeChannels,
-        bannerUrl: bannerPayload
+        bannerUrl: bannerPayload,
+        radiusKm,
+        latitude: storeCoords.lat,
+        longitude: storeCoords.lng,
+        storeLocation,
+        storeName: businessName
       });
 
       if (data && data.success) {
         setPublishedSuccess(true);
-        setPublishedResults(data.results || {});
+        setPublishedResults({
+          channels: data.results || {},
+          geofence: data.geofence
+        });
         setErrorLog(null);
       } else {
         setErrorLog(data?.error || data?.message || "Failed to publish campaign to selected channels.");
@@ -417,6 +502,36 @@ export const SocialPublishing: React.FC = () => {
                 
                 <strong className="text-[10px] font-black text-slate-400 tracking-widest uppercase block border-b border-slate-50 pb-2">Poster Layout Controls</strong>
 
+                {/* Geofence Delivery Radius Controller */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-indigo-600" /> Geofence Delivery Radius
+                    </label>
+                    <span className="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                      {radiusKm} KM Radius
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={radiusKm}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setRadiusKm(val);
+                    }}
+                    onMouseUp={() => fetchAiTargeting(radiusKm)}
+                    onTouchEnd={() => fetchAiTargeting(radiusKm)}
+                    className="w-full h-1.5 bg-slate-200 rounded-lg accent-rose-600 cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between text-[8px] text-slate-400 font-bold uppercase">
+                    <span>1 KM (Neighborhood)</span>
+                    <span className="text-indigo-600 font-extrabold">Accounts within {radiusKm}km of {businessName}</span>
+                    <span>50 KM (Metro Zone)</span>
+                  </div>
+                </div>
+
                 {/* Templates Selector Carousel */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block flex items-center gap-1">
@@ -575,7 +690,7 @@ export const SocialPublishing: React.FC = () => {
 
                   {/* Dynamic footer */}
                   <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[7px] text-slate-400 font-semibold select-none">
-                    <span>Target Delivery Circle: 5km Radius</span>
+                    <span className="font-bold text-amber-300/90">Target Delivery Circle: {radiusKm}km Radius ({businessName})</span>
                     <span>Broadcasting via AdPulse AdNet</span>
                   </div>
                 </div>
@@ -617,25 +732,37 @@ export const SocialPublishing: React.FC = () => {
             <div className="lg:col-span-3 space-y-4">
               <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white border border-indigo-900/40 rounded-3xl p-5 shadow-md space-y-4.5 text-left">
                 
-                <div className="flex items-center gap-2 border-b border-indigo-900/40 pb-3">
-                  <span className="bg-indigo-600/25 p-1.5 border border-indigo-500/20 rounded-lg">
-                    <Bot className="h-4.5 w-4.5 text-indigo-400" />
-                  </span>
-                  <div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider leading-none">AI Guided Suggestions</h4>
-                    <span className="text-[8.5px] font-bold text-indigo-300 uppercase block tracking-widest mt-0.5">Optimized Targeting</span>
+                <div className="flex items-center justify-between border-b border-indigo-900/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-indigo-600/25 p-1.5 border border-indigo-500/20 rounded-lg">
+                      <Bot className="h-4.5 w-4.5 text-indigo-400" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider leading-none">AI Guided Suggestions</h4>
+                      <span className="text-[8.5px] font-bold text-indigo-300 uppercase block tracking-widest mt-0.5">Optimized Targeting</span>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => fetchAiTargeting(radiusKm)}
+                    disabled={loadingAiTargeting}
+                    className="p-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-[9px] font-bold flex items-center gap-1 cursor-pointer transition-colors border border-indigo-500/30"
+                    title="Re-analyze targeting for current radius"
+                  >
+                    <RotateCw className={`h-3 w-3 ${loadingAiTargeting ? 'animate-spin' : ''}`} />
+                    <span>Re-Analyze</span>
+                  </button>
                 </div>
 
                 {/* AI Demographics suggestions block */}
-                <div className="space-y-3.5 text-[10.5px]">
+                <div className="space-y-3 text-[10.5px]">
                   
                   <div className="space-y-1">
                     <span className="text-indigo-300 font-extrabold uppercase tracking-widest text-[8px] flex items-center gap-1">
-                      <Users className="h-3 w-3" /> Recommended Demographics
+                      <Users className="h-3 w-3" /> Recommended Demographics ({radiusKm}km Zone)
                     </span>
-                    <p className="font-bold text-slate-200">
-                      Females aged 18-45 residing within 5km radius of your retail address. High affinity for cultural couture.
+                    <p className="font-bold text-slate-200 text-[10px] leading-snug">
+                      {aiTargeting?.recommendedDemographics || `Active consumers and tech buyers aged 18-48 residing within ${radiusKm}km of ${storeLocation}. High intent for local store visits.`}
                     </p>
                   </div>
 
@@ -643,9 +770,11 @@ export const SocialPublishing: React.FC = () => {
                     <span className="text-indigo-300 font-extrabold uppercase tracking-widest text-[8px] flex items-center gap-1">
                       <Clock className="h-3 w-3" /> Best Scheduling Times
                     </span>
-                    <strong className="text-slate-100 block">05:30 PM - 08:30 PM</strong>
+                    <strong className="text-slate-100 block text-[11px]">
+                      {aiTargeting?.bestSchedulingTimes || "05:30 PM - 08:30 PM"}
+                    </strong>
                     <p className="text-slate-400 text-[9.5px]">
-                      Predicted audience engagement rises by 4.2x during evening strolls and market visits.
+                      {aiTargeting?.schedulingReason || `Audience engagement in this ${radiusKm}km perimeter peaks during evening shopping hours.`}
                     </p>
                   </div>
 
@@ -653,15 +782,26 @@ export const SocialPublishing: React.FC = () => {
                     <span className="text-indigo-300 font-extrabold uppercase tracking-widest text-[8px] flex items-center gap-1">
                       <Smartphone className="h-3 w-3" /> Dialect Suggestion
                     </span>
-                    <p className="font-semibold text-slate-300">
-                      Include cultural phrases matching your regional calendar to trigger intense community connection and offline shop footfall.
+                    <p className="font-semibold text-slate-300 text-[9.5px] leading-snug">
+                      {aiTargeting?.dialectSuggestion || "Include authentic regional greetings (Odia/Hindi) to maximize trust with local residents."}
                     </p>
                   </div>
+
+                  {aiTargeting?.geofenceDeliveryPlan && (
+                    <div className="space-y-1">
+                      <span className="text-amber-300 font-extrabold uppercase tracking-widest text-[8px] flex items-center gap-1">
+                        <Globe className="h-3 w-3" /> Geofence Delivery Plan
+                      </span>
+                      <p className="font-medium text-slate-300 text-[9px] leading-snug">
+                        {aiTargeting.geofenceDeliveryPlan}
+                      </p>
+                    </div>
+                  )}
 
                 </div>
 
                 <div className="bg-white/5 border border-white/5 p-3 rounded-2xl text-[9px] text-indigo-200 font-semibold leading-relaxed">
-                  🚀 <strong>ROI Predictor:</strong> Launching this poster with a WhatsApp broadcasting campaign is projected to drive 120-180 store visits.
+                  🚀 <strong>ROI Predictor:</strong> {aiTargeting?.roiPredictor || `Targeting the ${radiusKm}km zone with ₹5,000 budget is projected to reach ${(radiusKm * 1500).toLocaleString()}+ accounts with 90-160 store visits.`}
                 </div>
 
               </div>
@@ -862,27 +1002,42 @@ export const SocialPublishing: React.FC = () => {
 
                 {/* SUCCESS FEEDBACK HUD */}
                 {publishedSuccess && publishedResults && (
-                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-4 rounded-2xl space-y-2 animate-fade-in">
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-4 rounded-2xl space-y-2.5 animate-fade-in">
                     <div className="flex items-center gap-2">
                       <Check className="h-4.5 w-4.5 text-emerald-600" />
                       <strong className="text-xs font-black text-emerald-900">Synchronized Broadcaster Success Report!</strong>
                     </div>
-                    <div className="text-[10.5px] font-semibold text-emerald-800 space-y-1.5 pl-6">
-                      {Object.keys(publishedResults).map(platform => (
-                        <div key={platform} className="flex items-center flex-wrap gap-2">
-                          <span>• <strong className="capitalize">{platform}</strong>: {publishedResults[platform]?.status === 'simulated' ? '✓ API Sandbox Verified Successful Delivery' : '✓ Live Posted successfully'} (ID: {publishedResults[platform]?.postId})</span>
-                          {publishedResults[platform]?.url && (
-                            <a 
-                              href={publishedResults[platform]?.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-indigo-200 transition-colors font-bold text-[10px]"
-                            >
-                              View on {platform.charAt(0).toUpperCase() + platform.slice(1)} <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                      ))}
+                    
+                    {/* Geofence Delivery Confirmation */}
+                    <div className="bg-white/80 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-emerald-900 font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Globe className="h-4 w-4 text-emerald-600 shrink-0" />
+                        Targeted to accounts within {publishedResults.geofence?.radiusKm || radiusKm} KM of {businessName}
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full">
+                        ~{((publishedResults.geofence?.estimatedTargetedAccounts || radiusKm * 1850)).toLocaleString()} Local Accounts In Radius
+                      </span>
+                    </div>
+
+                    <div className="text-[10.5px] font-semibold text-emerald-800 space-y-1.5 pl-2">
+                      {Object.keys(publishedResults.channels || publishedResults).filter(k => k !== 'geofence').map(platform => {
+                        const platObj = (publishedResults.channels || publishedResults)[platform];
+                        return (
+                          <div key={platform} className="flex items-center flex-wrap gap-2">
+                            <span>• <strong className="capitalize">{platform}</strong>: {platObj?.status === 'simulated' ? '✓ API Sandbox Verified Successful Delivery' : '✓ Live Posted successfully'} (ID: {platObj?.postId})</span>
+                            {platObj?.url && (
+                              <a 
+                                href={platObj?.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-indigo-200 transition-colors font-bold text-[10px]"
+                              >
+                                View on {platform.charAt(0).toUpperCase() + platform.slice(1)} <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1029,7 +1184,7 @@ export const SocialPublishing: React.FC = () => {
                         </div>
                         <div>
                           <h5 className="font-extrabold text-[9px] text-slate-800">local_retailer_hub</h5>
-                          <span className="text-[7.5px] text-indigo-500 font-bold block leading-none">Sponsored • 1.2km nearby</span>
+                          <span className="text-[7.5px] text-indigo-500 font-bold block leading-none">Sponsored • Within {radiusKm}km of {businessName}</span>
                         </div>
                       </div>
                       <span className="text-slate-400">•••</span>

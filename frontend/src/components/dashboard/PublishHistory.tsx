@@ -17,7 +17,8 @@ import {
   ChevronRight,
   TrendingUp,
   Sliders,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -45,6 +46,8 @@ export const PublishHistory: React.FC = () => {
   const [platformFilter, setPlatformFilter] = React.useState<string>('all');
   const [selectedEntry, setSelectedEntry] = React.useState<PublishHistoryEntry | null>(null);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ type: 'single'; entry: PublishHistoryEntry } | { type: 'all' } | null>(null);
+  const [deleting, setDeleting] = React.useState<boolean>(false);
   const [toast, setToast] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchHistory = async () => {
@@ -100,6 +103,55 @@ export const PublishHistory: React.FC = () => {
       showToast('error', err.message || "Failed to reach backend server.");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+
+    try {
+      if (deleteTarget.type === 'single') {
+        const entryId = deleteTarget.entry.id;
+        const response = await fetch(getApiUrl(`/api/social/publish-history/${entryId}`), {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
+          }
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+          showToast('success', 'Publication history record deleted successfully.');
+          setHistory(prev => prev.filter(h => h.id !== entryId));
+          if (selectedEntry?.id === entryId) {
+            setSelectedEntry(null);
+          }
+        } else {
+          showToast('error', data.message || 'Failed to delete history record.');
+        }
+      } else if (deleteTarget.type === 'all') {
+        const response = await fetch(getApiUrl('/api/social/publish-history'), {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('_hyperlocal_access_token')}`
+          }
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+          showToast('success', 'All publication history cleared successfully.');
+          setHistory([]);
+          setSelectedEntry(null);
+        } else {
+          showToast('error', data.message || 'Failed to clear publication history.');
+        }
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'Failed to communicate with backend server.');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -247,6 +299,17 @@ export const PublishHistory: React.FC = () => {
             </select>
           </div>
 
+          {history.length > 0 && (
+            <button 
+              onClick={() => setDeleteTarget({ type: 'all' })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-rose-50 border border-rose-200/80 text-rose-600 hover:text-rose-700 transition-colors text-xs font-bold cursor-pointer"
+              title="Clear all publication history"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Clear History</span>
+            </button>
+          )}
+
           <button 
             onClick={fetchHistory}
             className="p-2 rounded-xl hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-800 transition-colors"
@@ -382,7 +445,7 @@ export const PublishHistory: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-3.5 px-6 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setSelectedEntry(entry)}
                             className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-800 rounded-lg transition-colors cursor-pointer"
@@ -404,6 +467,17 @@ export const PublishHistory: React.FC = () => {
                               )}
                             </button>
                           )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget({ type: 'single', entry });
+                            }}
+                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Delete publication record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -437,12 +511,25 @@ export const PublishHistory: React.FC = () => {
                   </div>
                 </div>
                 
-                <button 
-                  onClick={() => setSelectedEntry(null)}
-                  className="p-1.5 rounded-xl hover:bg-slate-200/70 text-slate-450 transition-colors cursor-pointer text-slate-500 font-bold text-sm"
-                >
-                  ✕ Close
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setDeleteTarget({ type: 'single', entry: selectedEntry })}
+                    className="px-3 py-1.5 rounded-xl hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                    title="Delete this record"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete Record</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedEntry(null)}
+                    className="p-1.5 rounded-xl hover:bg-slate-200/70 text-slate-500 transition-colors cursor-pointer font-bold text-sm"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
               </div>
 
               {/* Modal Scroll Body */}
@@ -619,6 +706,69 @@ export const PublishHistory: React.FC = () => {
 
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[10000] select-none">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-100 text-left space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    {deleteTarget.type === 'single' ? 'Delete History Record?' : 'Clear All Publication History?'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    {deleteTarget.type === 'single' 
+                      ? `Remove entry for "${deleteTarget.entry.campaignName}" on ${deleteTarget.entry.platform.toUpperCase()}.`
+                      : 'This will remove all publication logs from your dashboard.'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-[11px] text-amber-800 font-medium leading-relaxed">
+                ℹ️ This will only remove the publication registry log from your view. Your live ad campaign configurations and social account connections will remain unchanged.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {deleting ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5" /> 
+                      {deleteTarget.type === 'single' ? 'Confirm Delete' : 'Clear All'}
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

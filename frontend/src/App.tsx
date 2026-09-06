@@ -25,25 +25,14 @@ export default function App() {
     if (path === '/auth/google/callback' || path === '/auth/google/callback/') {
       return 'google_callback';
     }
-    if (path === '/dashboard' || path === '/dashboard/') {
-      return currentUser ? 'dashboard' : 'landing';
-    }
-    return currentUser ? 'dashboard' : 'landing';
+    // Vercel link / main domain always opens the Landing Page first
+    return 'landing';
   });
 
   const [initialAuthMode, setInitialAuthMode] = React.useState<'signin' | 'signup' | 'complete_profile'>('signin');
   const [prefilledEmail, setPrefilledEmail] = React.useState('');
 
   React.useEffect(() => {
-    // Sync view with URL paths initially
-    const path = window.location.pathname;
-    if (path === '/dashboard' || path === '/dashboard/') {
-      if (!currentUser) {
-        window.history.replaceState({}, document.title, '/');
-        setView('landing');
-      }
-    }
-
     const handleExpired = () => {
       console.warn("[App] Unauthorized session expired event received. Logging out...");
       handleLogout();
@@ -53,7 +42,7 @@ export default function App() {
     return () => {
       window.removeEventListener('unauthorized-session-expired', handleExpired);
     };
-  }, [currentUser]);
+  }, []);
 
   const handleLaunchPortal = (mode?: 'login' | 'register') => {
     setInitialAuthMode(mode === 'register' ? 'signup' : 'signin');
@@ -73,7 +62,6 @@ export default function App() {
     localStorage.setItem('_hyperlocal_mock_session', JSON.stringify(user));
     localStorage.setItem('_logged_user_email', user.email);
     localStorage.setItem('_hyperlocal_access_token', token);
-    window.history.replaceState({}, document.title, '/dashboard');
     setView('dashboard');
   };
 
@@ -88,7 +76,6 @@ export default function App() {
     localStorage.removeItem('_hyperlocal_mock_session');
     localStorage.removeItem('_logged_user_email');
     localStorage.removeItem('_onboarding_completed');
-    window.history.replaceState({}, document.title, '/');
     setView('landing');
   };
 

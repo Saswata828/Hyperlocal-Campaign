@@ -28,7 +28,8 @@ import {
   ArrowRight,
   Sparkle,
   Layers,
-  HeartHandshake
+  HeartHandshake,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dashboardService, Campaign } from '../../services/dashboardService';
@@ -70,7 +71,7 @@ export const AiCampaignGenerator: React.FC<{
   const [offer, setOffer] = React.useState('Flat 20% off with Free Complimentary Gift Box');
   const [audience, setAudience] = React.useState('Ethnic weavers, families and modern festive shoppers');
   const [objective, setObjective] = React.useState('Increase Offline Footfall');
-  const [selectedPlatforms, setSelectedPlatforms] = React.useState<string[]>(['Instagram', 'WhatsApp']);
+  const [selectedPlatforms, setSelectedPlatforms] = React.useState<string[]>(['Facebook', 'Instagram']);
   const [radiusKm, setRadiusKm] = React.useState(5);
   const [budget, setBudget] = React.useState(15000);
 
@@ -150,6 +151,14 @@ export const AiCampaignGenerator: React.FC<{
   // Notifications feedback
   const [notiStatus, setNotiStatus] = React.useState<{ type: 'success' | 'info'; text: string } | null>(null);
 
+  // Live social broadcast states
+  const [isPublishingLive, setIsPublishingLive] = React.useState(false);
+  const [livePublishResult, setLivePublishResult] = React.useState<{
+    success: boolean;
+    results?: Record<string, { status: string; postId?: string; url?: string }>;
+    error?: string;
+  } | null>(null);
+
   // Selected Version shortcut
   const activeVariation = variations.find(v => v.id === selectedVarId) || variations[0];
 
@@ -164,11 +173,19 @@ export const AiCampaignGenerator: React.FC<{
       setStores(storeList);
       if (storeList.length > 0) {
         // Automatically default location to primary physical store address
-        const primaryStoreLocation = storeList[0].address || storeList[0].name;
+        const primaryStore = storeList[0];
+        const primaryStoreLocation = primaryStore.address || primaryStore.name;
         // Clean address mapping
         if (primaryStoreLocation.toLowerCase().includes("delhi")) setStoreLocation("Connaught Place, New Delhi");
         else if (primaryStoreLocation.toLowerCase().includes("kolkata")) setStoreLocation("Salt Lake, Kolkata");
         else setStoreLocation(primaryStoreLocation);
+
+        if (primaryStore.radiusTargetKm) {
+          setRadiusKm(Number(primaryStore.radiusTargetKm));
+        }
+        if (primaryStore.category) {
+          setBusinessCategory(primaryStore.category);
+        }
       }
 
       const productList = await apiService.getProducts();
@@ -234,7 +251,8 @@ export const AiCampaignGenerator: React.FC<{
         objective,
         platforms: selectedPlatforms,
         budget,
-        language
+        language,
+        radiusKm
       });
 
       setVariations(data);
@@ -477,6 +495,113 @@ export const AiCampaignGenerator: React.FC<{
       onCampaignSaved();
     } catch (error) {
       console.error("Save camp error:", error);
+    }
+  };
+
+  // Direct 1-Click Live Social Media Broadcasting (Facebook Page + Instagram Feed)
+  const handlePublishLiveToSocial = async () => {
+    if (!activeVariation) return;
+
+    // Standardize platform keys for backend broadcast
+    let platformsToPublish = (selectedPlatforms || [])
+      .map(p => p.toLowerCase().replace('/x', '').trim())
+      .filter(p => ['facebook', 'instagram', 'whatsapp'].includes(p));
+
+    try {
+      const connsData = await apiService.getSocialConnections().catch(() => null);
+      if (connsData && Array.isArray(connsData.connections)) {
+        const connectedNames = connsData.connections
+          .filter((c: any) => c.connected)
+          .map((c: any) => c.platform.toLowerCase());
+
+        const filtered = platformsToPublish.filter(p => connectedNames.includes(p));
+        if (filtered.length > 0) {
+          platformsToPublish = filtered;
+        } else {
+          platformsToPublish = connectedNames.filter(p => ['facebook', 'instagram'].includes(p));
+        }
+      }
+    } catch (e) {
+      // Fallback: exclude whatsapp if unconfigured
+      platformsToPublish = platformsToPublish.filter(p => p !== 'whatsapp');
+    }
+
+    if (platformsToPublish.length === 0) {
+      platformsToPublish = ['facebook', 'instagram'];
+    }
+
+    setIsPublishingLive(true);
+    setLivePublishResult(null);
+    showNotification('info', `Broadcasting live to ${platformsToPublish.map(p => p.toUpperCase()).join(' & ')}...`);
+
+    const campData: any = {
+      id: `camp-${Date.now()}`,
+      name: name || `${festival} Local Drive`,
+      goal: objective,
+      festival,
+      audience,
+      radiusKm,
+      budget,
+      offer,
+      tone: activeVariation.styleName,
+      platforms: selectedPlatforms,
+      status: 'Active',
+      reach: activeVariation.expectedReach || 12000,
+      engagement: Math.round((activeVariation.expectedReach || 12000) * ((activeVariation.expectedEngagement || 12) / 100)),
+      leads: Math.round((activeVariation.expectedReach || 12000) * 0.012),
+      roi: Math.round((activeVariation.strengthScore || 85) * 3.1),
+      startDate: new Date().toISOString().split('T')[0],
+      generatedHeadline: activeVariation.headline,
+      generatedCaption: activeVariation.caption,
+      generatedCtas: [activeVariation.cta],
+      generatedHashtags: activeVariation.hashtags
+    };
+
+    try {
+      // 1. Save campaign into dashboard database
+      await apiService.createCampaign(campData);
+      loadCampaignHistory();
+      onCampaignSaved();
+
+      // 2. Prepare full caption copy
+      const fullCaption = `${activeVariation.headline}\n\n${activeVariation.caption}\n\n👉 ${activeVariation.cta}\n\n${(activeVariation.hashtags || []).join(' ')}`;
+
+      // 3. Dispatch to Meta live pipeline
+      const publishRes = await apiService.publishSocial({
+        campaignId: campData.id,
+        caption: fullCaption,
+        headline: activeVariation.headline,
+        platforms: platformsToPublish,
+        bannerUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=80",
+        radiusKm,
+        storeLocation,
+        storeName: stores[0]?.name || "Store"
+      });
+
+      if (publishRes && publishRes.success) {
+        setLivePublishResult({
+          success: true,
+          results: publishRes.results || {}
+        });
+        showNotification('success', '🎉 Live Social Broadcast successful! View your live posts below.');
+      } else {
+        const errMsg = publishRes?.error || publishRes?.message || 'Social broadcast partial failure.';
+        setLivePublishResult({
+          success: false,
+          error: errMsg
+        });
+        showNotification('info', 'Broadcast completed with notes. See diagnostic feedback below.');
+      }
+    } catch (err: any) {
+      console.error('Publish Live error:', err);
+      const serverDetails = err.response?.data?.error || err.response?.data?.logs || err.response?.data?.message || err.message;
+      setLivePublishResult({
+        success: false,
+        error: typeof serverDetails === 'string' ? serverDetails : JSON.stringify(serverDetails)
+      });
+      showNotification('info', 'Publishing attempted. Check your connected account credentials.');
+    } finally {
+      setIsPublishingLive(false);
     }
   };
 
@@ -887,8 +1012,8 @@ export const AiCampaignGenerator: React.FC<{
                 </div>
                 <input
                   type="range"
-                  min="2"
-                  max="15"
+                  min="1"
+                  max="50"
                   value={radiusKm}
                   onChange={(e) => setRadiusKm(Number(e.target.value))}
                   className="w-full h-1 bg-slate-100 rounded-lg accent-rose-500 cursor-pointer"
@@ -1286,55 +1411,109 @@ export const AiCampaignGenerator: React.FC<{
                 </div>
 
                 {/* SAVING / SHARING CONTROLS FOOTER */}
-                <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleSaveActiveCampaign('Draft')}
-                      className="rounded-xl text-[10px] font-extrabold"
-                    >
-                      <Save className="h-3.5 w-3.5 mr-1 text-slate-500" />
-                      <span>Save Draft</span>
-                    </Button>
+                <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
+                  {/* DIRECT 1-CLICK LIVE BROADCAST BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handlePublishLiveToSocial}
+                    disabled={isPublishingLive}
+                    className="w-full py-3 px-4 rounded-2xl text-xs font-black uppercase tracking-wider text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-600 hover:from-blue-700 hover:via-indigo-700 hover:to-pink-700 active:scale-98 transition-all shadow-md hover:shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    id="btn-publish-live-social"
+                  >
+                    {isPublishingLive ? (
+                      <>
+                        <RotateCw className="h-4 w-4 text-white animate-spin" />
+                        <span>Broadcasting to Facebook & Instagram...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="h-4 w-4 text-white" />
+                        <span>🚀 Publish Live to Connected Social Accounts</span>
+                      </>
+                    )}
+                  </button>
 
-                    <Button
-                      variant="secondary"
-                      onClick={() => handleSaveActiveCampaign('Scheduled')}
-                      className="rounded-xl text-[10px] font-extrabold"
+                  {/* LIVE BROADCAST STATUS RESULTS DISPLAY */}
+                  {livePublishResult && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-3 rounded-2xl border text-xs ${
+                        livePublishResult.success
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                          : 'bg-rose-50 border-rose-200 text-rose-900'
+                      }`}
                     >
-                      <Settings className="h-3.5 w-3.5 mr-1 text-indigo-500 animate-spin" />
-                      <span>Schedule Ad</span>
-                    </Button>
+                      {livePublishResult.success ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                            <Check className="h-4 w-4 text-emerald-600" />
+                            <span>Campaign Successfully Published Live!</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {livePublishResult.results?.facebook?.url && (
+                              <a
+                                href={livePublishResult.results.facebook.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-extrabold text-[11px] shadow-sm transition-all"
+                              >
+                                <Facebook className="h-3.5 w-3.5" />
+                                <span>View on Facebook</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                            {livePublishResult.results?.instagram?.url && (
+                              <a
+                                href={livePublishResult.results.instagram.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-extrabold text-[11px] shadow-sm transition-all"
+                              >
+                                <Instagram className="h-3.5 w-3.5" />
+                                <span>View on Instagram</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                            <Info className="h-4 w-4 text-rose-600 shrink-0" />
+                            <span>Broadcast Note:</span>
+                          </div>
+                          <p className="text-[11px] text-rose-700 font-mono leading-tight whitespace-pre-wrap max-h-24 overflow-y-auto">
+                            {livePublishResult.error}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-semibold pt-1">
+                            Tip: Make sure your Facebook Page & Instagram token are active in <strong>Connected Accounts</strong>.
+                          </p>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
 
-                    <Button
-                      variant="primary"
-                      onClick={() => handleSaveActiveCampaign('Active')}
-                      className="rounded-xl text-[10px] font-extrabold"
-                    >
-                      <Send className="h-3.5 w-3.5 mr-1 text-white animate-pulse" />
-                      <span>Push active</span>
-                    </Button>
-                  </div>
-
-                  {/* Duplicate / Export text buttons */}
+                  {/* CLEAN SECONDARY ACTIONS (Save Draft & Copy) */}
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={handleDuplicateVersion}
-                      className="py-2 text-[9px] uppercase font-black tracking-wider text-rose-700 bg-rose-50 rounded-xl hover:bg-rose-100 text-center flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 border border-rose-150"
+                      onClick={() => handleSaveActiveCampaign('Draft')}
+                      className="py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
                     >
-                      <span>👥 Duplicate Version</span>
+                      <Save className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Save Draft</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={handleExportText}
-                      className="py-2 text-[9px] uppercase font-black tracking-wider text-black bg-slate-100 rounded-xl hover:bg-slate-200 text-center flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 border border-slate-200"
+                      className="py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-3.5 w-3.5 text-slate-400" />
                       <span>Export Text Copy</span>
                     </button>
                   </div>
-
                 </div>
 
               </motion.div>

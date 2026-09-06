@@ -279,7 +279,9 @@ async function runApi<T>(apiPromise: Promise<T>, emulatedFn: () => Promise<T>): 
 export const apiService = {
   // --- AUTH SERVICES ---
   async getGoogleAuthUrl() {
-    const appUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const appUrl = typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : ((import.meta as any).env?.VITE_APP_URL || "https://hyperlocal-campaign.vercel.app");
     const redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
     return runApi(
       apiClient.get(`/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`).then(res => res.data),
@@ -293,7 +295,9 @@ export const apiService = {
   },
 
   async exchangeGoogleCode(code: string) {
-    const appUrl = (import.meta as any).env?.VITE_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const appUrl = typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : ((import.meta as any).env?.VITE_APP_URL || "https://hyperlocal-campaign.vercel.app");
     const redirectUri = `${appUrl.replace(/\/+$/, "")}/auth/google/callback`;
     return runApi(
       apiClient.get(`/auth/google/exchange?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`).then(res => res.data),
@@ -999,6 +1003,7 @@ export const apiService = {
     platforms?: string[];
     budget?: number;
     language?: string;
+    radiusKm?: number;
   }) {
     return runApi(
       apiClient.post("/campaigns/copilot-generate", params).then(res => res.data),
@@ -1261,6 +1266,70 @@ export const apiService = {
     );
   },
 
+  async getRealtimeAnalytics() {
+    return runApi(
+      apiClient.get("/analytics/realtime").then(res => res.data),
+      async () => {
+        const campaigns = getEmulatedCampaigns();
+        const active = campaigns.filter(c => c.status === "Active" || c.status === "Completed");
+        const totalReach = active.reduce((acc, c) => acc + (c.reach || 0), 0);
+        const totalEngagement = active.reduce((acc, c) => acc + (c.engagement || 0), 0);
+        const totalClicks = active.reduce((acc, c) => acc + (c.leads || 0), 0);
+        const conversionRate = totalReach > 0 ? parseFloat(((totalClicks / totalReach) * 100).toFixed(1)) : 0;
+        const engagementRate = totalReach > 0 ? parseFloat(((totalEngagement / totalReach) * 100).toFixed(1)) : 0;
+
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const now = new Date();
+        const timeline = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          const dayName = days[d.getDay()];
+          const dayFactor = ((d.getDay() + 2) % 7) + 1;
+          const dayReach = Math.round((totalReach / 9) * (dayFactor / 4));
+          timeline.push({
+            date: d.toISOString().split("T")[0],
+            name: dayName,
+            Reach: dayReach,
+            Engagement: Math.round(dayReach * 0.08),
+            Leads: Math.round(dayReach * 0.025),
+            impressions: Math.round(dayReach * 1.3)
+          });
+        }
+
+        return {
+          success: true,
+          serverTimestamp: new Date().toISOString(),
+          summary: {
+            totalPublished: 0,
+            activeCampaigns: active.length,
+            totalReach,
+            totalImpressions: Math.round(totalReach * 1.35),
+            totalEngagement,
+            totalLikes: Math.round(totalEngagement * 0.7),
+            totalComments: Math.round(totalEngagement * 0.3),
+            totalClicks,
+            conversionRate,
+            engagementRate
+          },
+          platforms: [
+            { name: "Facebook", postsCount: 0, reach: Math.round(totalReach * 0.5), engagement: Math.round(totalEngagement * 0.5), clicks: Math.round(totalClicks * 0.5), color: "#3b82f6" },
+            { name: "Instagram", postsCount: 0, reach: Math.round(totalReach * 0.5), engagement: Math.round(totalEngagement * 0.5), clicks: Math.round(totalClicks * 0.5), color: "#ec4899" }
+          ],
+          timeline,
+          recentPosts: []
+        };
+      }
+    );
+  },
+
+  async syncLiveAnalytics() {
+    return runApi(
+      apiClient.post("/analytics/sync-live").then(res => res.data),
+      async () => ({ success: true, message: "Local telemetry cache refreshed." })
+    );
+  },
+
   // --- SOCIAL MEDIA PUBLISHING & CONNECTIONS SERVICES ---
   async getSocialConnections() {
     return runApi(
@@ -1280,11 +1349,35 @@ export const apiService = {
     );
   },
 
-  async publishSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; bannerUrl?: string }) {
+  async publishSocial(payload: {
+    campaignId?: string;
+    caption: string;
+    headline?: string;
+    platforms: string[];
+    bannerUrl?: string;
+    radiusKm?: number;
+    latitude?: number;
+    longitude?: number;
+    storeLocation?: string;
+    storeName?: string;
+  }) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("__api_use_client_emulation");
     }
     return apiClient.post("/social/publish", payload).then(res => res.data);
+  },
+
+  async getAiTargetingSuggestions(payload: {
+    storeLocation?: string;
+    category?: string;
+    product?: string;
+    headline?: string;
+    radiusKm?: number;
+    latitude?: number;
+    longitude?: number;
+    budget?: number;
+  }) {
+    return apiClient.post("/ai/targeting-suggestions", payload).then(res => res.data);
   },
 
   async scheduleSocial(payload: { campaignId?: string; caption: string; headline?: string; platforms: string[]; scheduledDate: string; bannerUrl?: string }) {

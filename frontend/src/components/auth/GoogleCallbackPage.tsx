@@ -42,6 +42,15 @@ export function GoogleCallbackPage({ onSuccess, onCompleteProfileRequired, onCan
           const token = response.accessToken;
 
           setTimeout(() => {
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({
+                type: 'GOOGLE_AUTH_SUCCESS',
+                user,
+                token
+              }, '*');
+              window.close();
+              return;
+            }
             window.history.replaceState({}, document.title, '/dashboard');
             if (user && user.registrationCompleted === false) {
               onCompleteProfileRequired(user.email, token);

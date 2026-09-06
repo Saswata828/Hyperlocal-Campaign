@@ -17,7 +17,8 @@ import {
   Share2,
   Tv,
   CheckCircle2,
-  Plus
+  Plus,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dashboardService, Campaign, Store, subscribeToDashboardState } from '../../services/dashboardService';
@@ -29,12 +30,7 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  Legend, 
-  LineChart, 
-  Line 
+  ResponsiveContainer 
 } from 'recharts';
 
 export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ onViewTab }) => {
@@ -43,11 +39,35 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
   const [loadingLaunch, setLoadingLaunch] = React.useState(false);
   const [launchedSuccess, setLaunchedSuccess] = React.useState(false);
   const [headingIndex, setHeadingIndex] = React.useState(0);
+  const [realtimeData, setRealtimeData] = React.useState<any>(null);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [lastSyncedTime, setLastSyncedTime] = React.useState<string>("");
 
-  // Load up real-time campaigns and stores
-  const loadDashboardData = () => {
+  // Load up real-time campaigns, stores, and live post analytics
+  const loadDashboardData = async () => {
     setCampaigns(dashboardService.getCampaigns());
     setStores(dashboardService.getStores());
+    try {
+      const res = await apiService.getRealtimeAnalytics();
+      if (res && res.summary) {
+        setRealtimeData(res);
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
+    } catch (e) {
+      console.error("Failed to load real-time analytics:", e);
+    }
+  };
+
+  const handleSyncLive = async () => {
+    setIsSyncing(true);
+    try {
+      await apiService.syncLiveAnalytics();
+      await loadDashboardData();
+    } catch (e) {
+      console.error("Failed to sync live analytics:", e);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   React.useEffect(() => {
@@ -61,21 +81,13 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
     };
   }, []);
 
-  // Compute live aggregates and averages
+  // Compute live aggregates directly from actual posts and active campaigns
   const totalCampaigns = campaigns.length;
   const activeCampaignsCount = campaigns.filter(c => c.status === 'Active').length;
-  const totalReach = campaigns.reduce((acc, c) => acc + (c.reach || 0), 0) || 54200;
-  const totalLeads = campaigns.reduce((acc, c) => acc + (c.leads || 0), 0) || 1240;
-
-  // Real Conversion % (Leads / Reach) or baseline 3.8%
-  const conversionRate = totalReach > 0 
-    ? parseFloat(((totalLeads / totalReach) * 100).toFixed(1)) 
-    : 3.8;
-
-  // Engagement % Average (Engagement / Reach) or base 6.2%
-  const engagementRate = campaigns.length > 0
-    ? parseFloat((campaigns.reduce((acc, c) => acc + (c.reach ? ((c.engagement || 0) / c.reach) * 100 : 6.2), 0) / campaigns.length).toFixed(1))
-    : 6.2;
+  const totalReach = realtimeData?.summary?.totalReach ?? (campaigns.reduce((acc, c) => acc + (c.reach || 0), 0));
+  const totalLeads = realtimeData?.summary?.totalClicks ?? (campaigns.reduce((acc, c) => acc + (c.leads || 0), 0));
+  const conversionRate = realtimeData?.summary?.conversionRate ?? (totalReach > 0 ? parseFloat(((totalLeads / totalReach) * 100).toFixed(1)) : 0);
+  const engagementRate = realtimeData?.summary?.engagementRate ?? (campaigns.length > 0 ? parseFloat((campaigns.reduce((acc, c) => acc + (c.reach ? ((c.engagement || 0) / c.reach) * 100 : 0), 0) / campaigns.length).toFixed(1)) : 0);
 
   // Nearby Audience intelligence dynamically calculated from configured shop radii
   const primaryStore = stores[0] || { name: 'Sambalpur Saree Kendra', radiusTargetKm: 5, latitude: 21.4669 };
@@ -171,32 +183,20 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
     }
   };
 
-  // Recharts Analytics Datasets
-  const hyperlocalPerformanceData = [
-    { name: 'Mon', Reach: 4200, Engagement: 980, Leads: 52 },
-    { name: 'Tue', Reach: 8900, Engagement: 2100, Leads: 110 },
-    { name: 'Wed', Reach: 15600, Engagement: 3500, Leads: 198 },
-    { name: 'Thu', Reach: 21000, Engagement: 4900, Leads: 280 },
-    { name: 'Fri', Reach: 34500, Engagement: 7800, Leads: 450 },
-    { name: 'Sat', Reach: 48900, Engagement: 11200, Leads: 680 },
-    { name: 'Sun', Reach: totalReach || 54200, Engagement: (totalReach * 0.25).toFixed(0), Leads: totalLeads || 1240 }
+  // Dynamic 7-day performance data strictly from live post aggregator or real campaigns
+  const defaultEmptyTimeline = [
+    { name: 'Mon', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Tue', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Wed', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Thu', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Fri', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Sat', Reach: 0, Engagement: 0, Leads: 0 },
+    { name: 'Sun', Reach: 0, Engagement: 0, Leads: 0 }
   ];
 
-  const predictiveFestivalData = [
-    { name: 'Raja Festival', Reach: 28000, expectedRoiPercentage: 350, conversionPercentage: 4.8 },
-    { name: 'Nuakhai Juhar', Reach: 35000, expectedRoiPercentage: 420, conversionPercentage: 5.6 },
-    { name: 'Durga Puja', Reach: 42000, expectedRoiPercentage: 380, conversionPercentage: 4.2 },
-    { name: 'Diwali Lights', Reach: 49000, expectedRoiPercentage: 440, conversionPercentage: 5.1 }
-  ];
-
-  const hourlyTractionData = [
-    { hour: '09:00 AM', Inquiries: 12, Traffic: 45 },
-    { hour: '12:00 PM', Inquiries: 28, Traffic: 92 },
-    { hour: '03:00 PM', Inquiries: 42, Traffic: 130 },
-    { hour: '05:00 PM', Inquiries: 110, Traffic: 390 },
-    { hour: '07:00 PM', Inquiries: 195, Traffic: 512 },
-    { hour: '09:00 PM', Inquiries: 85, Traffic: 220 }
-  ];
+  const performanceTimeline = (realtimeData?.timeline && realtimeData.timeline.length > 0)
+    ? realtimeData.timeline
+    : defaultEmptyTimeline;
 
   return (
     <div className="space-y-6 text-left" id="dashboard-home-rendered-suite">
@@ -215,7 +215,23 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
           </p>
         </div>
 
-
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={handleSyncLive}
+            disabled={isSyncing}
+            title="Fetch live reactions, likes, and comments from Meta Graph API"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-indigo-600 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing Meta Live...' : '🔄 Sync Live Analytics'}</span>
+          </button>
+          {lastSyncedTime && (
+            <span className="text-[10px] text-slate-400 font-bold hidden md:inline bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-lg">
+              Live: {lastSyncedTime}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Hero Welcome Box with Location-aware Action CTA */}
@@ -307,8 +323,15 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
             <h3 className="text-2xl font-black text-slate-900 leading-none">
               {totalReach >= 1000 ? `${(totalReach / 1000).toFixed(1)}k` : totalReach}
             </h3>
-            <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-0.5 mt-2">
-              <ArrowUpRight className="h-3 w-3 shrink-0" /> +18.4% local residents
+            <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5 mt-2">
+              {totalReach > 0 ? (
+                <>
+                  <ArrowUpRight className="h-3 w-3 text-emerald-600" />
+                  <span className="text-emerald-600 font-bold">Verified Reach</span>
+                </>
+              ) : (
+                'Live Tracking Active'
+              )}
             </span>
           </div>
         </div>
@@ -324,7 +347,7 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 leading-none">{activeCampaignsCount}</h3>
             <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5 mt-2">
-              Currently broadcasted live
+              {activeCampaignsCount > 0 ? 'Currently broadcasted live' : 'No active campaigns'}
             </span>
           </div>
         </div>
@@ -339,8 +362,15 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 leading-none">{conversionRate}%</h3>
-            <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-0.5 mt-2">
-              <ArrowUpRight className="h-3 w-3 shrink-0" /> +0.4% versus regional avg
+            <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5 mt-2">
+              {conversionRate > 0 ? (
+                <>
+                  <ArrowUpRight className="h-3 w-3 text-emerald-600" />
+                  <span className="text-emerald-600 font-bold">Inquiries vs Reach</span>
+                </>
+              ) : (
+                'Based on live leads'
+              )}
             </span>
           </div>
         </div>
@@ -355,37 +385,44 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 leading-none">{engagementRate}%</h3>
-            <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-0.5 mt-2">
-              <ArrowUpRight className="h-3 w-3" /> Peak 05:00 PM - 09:00 PM
+            <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5 mt-2">
+              {engagementRate > 0 ? (
+                <>
+                  <ArrowUpRight className="h-3 w-3 text-emerald-600" />
+                  <span className="text-emerald-600 font-bold">Likes & Comments</span>
+                </>
+              ) : (
+                'Social Interaction Rate'
+              )}
             </span>
           </div>
         </div>
 
-        {/* Core Metric 5: Nearby Audience */}
+        {/* Core Metric 5: Target Radius */}
         <div className="col-span-2 md:col-span-1 bg-white p-4.5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nearby Audience</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Radius</span>
             <span className="h-7 w-7 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center">
               <Target className="h-4 w-4" />
             </span>
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 leading-none">
-              {totalNearbyAudience.toLocaleString()}
+              {primaryStore?.radiusTargetKm || 5} km
             </h3>
             <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-0.5 mt-2">
-              Within {primaryStore?.radiusTargetKm || 5}km radius zone
+              Configured Store Radius
             </span>
           </div>
         </div>
 
       </div>
 
-      {/* THREE INTERACTIVE ANIMATED RECHARTS CHARTS BENTO GRID */}
+      {/* REAL-TIME REACH PERFORMANCE & ACTIVE CAMPAIGNS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Chart 1: Hyperlocal Delivery Analytics */}
-        <div className="lg:col-span-8 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
+        {/* Real-time Hyperlocal Reach & Leads Progress */}
+        <div className="lg:col-span-7 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-50 pb-4 mb-4">
               <div>
@@ -393,16 +430,16 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
                   <span>Hyperlocal Reach & Leads Progress</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 font-medium">Daily cumulative ad engagement within delivery circles</p>
+                <p className="text-[11px] text-slate-400 font-medium">Real-time daily engagement from verified published posts</p>
               </div>
               <span className="text-[9.5px] bg-slate-50 text-slate-550 border border-slate-200/60 font-black px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
                 <Calendar className="h-3 w-3" /> Seven Days History
               </span>
             </div>
 
-            <div className="h-[250px] w-full mt-4">
+            <div className="h-[260px] w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={hyperlocalPerformanceData}>
+                <AreaChart data={performanceTimeline}>
                   <defs>
                     <linearGradient id="colorReachFlow" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -425,87 +462,18 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
           </div>
 
           <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-[10px] text-slate-650 font-bold mt-4">
-            <span className="text-slate-500 leading-tight">💡 Campaign optimizer indicates weekend ad templates with local language captions show a 2.5x higher conversions average.</span>
+            <span className="text-slate-500 leading-tight">💡 Metrics update in real-time as new posts are published or interactions are received from Meta.</span>
             <button
               onClick={() => onViewTab('generator')}
               className="bg-white hover:bg-slate-100 text-indigo-750 border border-slate-200 px-3 py-1.5 rounded-xl shrink-0 cursor-pointer transition-all text-[10px] font-black"
             >
-              Tune Campaign Captions
+              Launch New Campaign
             </button>
           </div>
         </div>
 
-        {/* Chart 2: Regional Festivals Predictive ROI Analysis */}
-        <div className="lg:col-span-4 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="border-b border-slate-50 pb-4 mb-4 text-left">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-purple-600 animate-spin" style={{ animationDuration: '6s' }} />
-                <span>Geocultural Festival Index</span>
-              </h3>
-              <p className="text-[11px] text-slate-400 font-medium">Predicted conversion & ROI multiplier for upcoming regional feasts</p>
-            </div>
-
-            <div className="h-[180px] w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={predictiveFestivalData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '11px' }} />
-                  <Bar dataKey="expectedRoiPercentage" name="Expected ROI Mutliplier %" fill="#818cf8" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="conversionPercentage" name="Target Audience Conversion %" fill="#34d399" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="space-y-2 mt-4 text-[10.5px]">
-              <div className="flex items-center justify-between py-1 border-b border-dashed border-slate-100 font-bold">
-                <span className="text-slate-400 uppercase tracking-widest text-[9.5px]">Trending Festivity</span>
-                <span className="text-indigo-650 bg-indigo-50 px-2 rounded-lg font-black">{isSambalpur ? 'Nuakhai Juhar' : 'Autumn Festival'}</span>
-              </div>
-              <div className="flex items-center justify-between py-1 font-bold">
-                <span className="text-slate-400 uppercase tracking-widest text-[9.5px]">Peak Posting Hour</span>
-                <span className="text-amber-755 text-amber-700 bg-amber-50 px-2 rounded-lg font-black">05:30 PM - 08:30 PM</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-50 text-[10px] text-slate-450 font-bold flex items-center gap-1">
-            <span className="text-emerald-505 text-emerald-600 font-black">● 4.2x ROI</span> Predicted for regional clothing & delicacies.
-          </div>
-        </div>
-
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Chart 3: Live Hourly Customer Inquiries Heatmap */}
-        <div className="lg:col-span-6 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs">
-          <div className="border-b border-slate-50 pb-4 mb-4">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-              <Clock className="h-4.5 w-4.5 text-indigo-505 text-indigo-600 shrink-0" />
-              <span>Hourly Traffic & Engagement Spike Index</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 font-medium">Monitors nearby audience active times to recommend high-yield broadcasting hours</p>
-          </div>
-
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hourlyTractionData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                <XAxis dataKey="hour" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                <Tooltip />
-                <Line type="monotone" name="Foot Traffic Estimate" dataKey="Traffic" stroke="#f59e0b" strokeWidth={3} activeDot={{ r: 6 }} />
-                <Line type="monotone" name="Inquiries Received" dataKey="Inquiries" stroke="#6366f1" strokeWidth={3} activeDot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Real-time Campaigns Quick Slider + Recommended Campaign Action (NEVER EMPTY) */}
-        <div className="lg:col-span-6 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
+        {/* Real-time Campaigns Quick Slider + Active State */}
+        <div className="lg:col-span-5 bg-white border border-slate-100 rounded-3xl p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-50 pb-3 mb-4">
               <h3 className="text-sm font-bold text-slate-800">
@@ -534,54 +502,33 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
                   <div className="pt-2 border-t border-slate-200/50 grid grid-cols-3 gap-2 text-center text-[10px] font-extrabold text-slate-705">
                     <div className="bg-white p-1 rounded-lg border border-slate-100">
                       <span className="text-[8px] text-slate-400 font-bold block">REACH</span>
-                      <strong className="text-slate-800 font-black">{camp.reach ? camp.reach.toLocaleString() : '1,200'}</strong>
+                      <strong className="text-slate-800 font-black">{camp.reach ? camp.reach.toLocaleString() : '0'}</strong>
                     </div>
                     <div className="bg-white p-1 rounded-lg border border-slate-100">
                       <span className="text-[8px] text-slate-400 font-bold block">INQUIRIES</span>
-                      <strong className="text-slate-800 font-black">{camp.leads || 24}</strong>
+                      <strong className="text-slate-800 font-black">{camp.leads || 0}</strong>
                     </div>
                     <div className="bg-white p-1 rounded-lg border border-slate-100">
                       <span className="text-[8px] text-slate-400 font-bold block">ROI</span>
-                      <strong className="text-emerald-600 font-black">+{camp.roi || 240}%</strong>
+                      <strong className="text-emerald-600 font-black">+{camp.roi || 0}%</strong>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* DYNAMIC, INTERACTIVE ALTERNATIVE REPLACES EMPTY STATE "No active push campaigns" */}
+              {/* SIMPLE CLEAN EMPTY STATE */}
               {campaigns.filter(c => c.status === 'Active').length === 0 && (
-                <div className="p-5 border-2 border-dashed border-slate-200 rounded-2xl text-center space-y-4 animate-fade-in" id="recommended-interactive-campaign-box">
-                  <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-indigo-600">
-                    <Sparkles className="h-5 w-5 animate-pulse" />
-                  </div>
-                  <div className="space-y-1">
-                    <strong className="text-xs font-black text-slate-850 block">Generate Your First Campaign in 1 Click!</strong>
-                    <p className="text-[10.5px] text-slate-405 text-slate-500 max-w-xs mx-auto leading-relaxed font-semibold">
-                      Establish an immediate hyperlocal presence in {isSambalpur ? 'Sambalpur' : 'your city'} with our high-conversion festival templates.
-                    </p>
-                  </div>
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={handleFastLaunchCampaign}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-black px-4 py-2 rounded-xl transition-all cursor-pointer shadow-md inline-flex items-center gap-1 hover:scale-[1.01]"
-                    >
-                      <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" /> Fast AI Auto-Launch
-                    </button>
-                    <button
-                      onClick={() => onViewTab('generator')}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-extrabold px-4 py-2 rounded-xl transition-all cursor-pointer border border-slate-200"
-                    >
-                      Custom Setup
-                    </button>
-                  </div>
+                <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-600">No Active Campaigns</p>
+                  <p className="text-[11px] text-slate-400 font-medium">Your live targeted broadcasts will appear here.</p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-50 text-[10px] text-slate-450 font-semibold leading-relaxed flex items-center gap-1">
-            <span>🚀</span>
-            <span><strong>Location Insight:</strong> Budharaja and Khetrajpur locations show strong clothing inquiry rates between 6 PM to 9 PM.</span>
+            <span>📍</span>
+            <span><strong>Store Target Zone:</strong> Active within {primaryStore?.radiusTargetKm || 5}km radius of {primaryStore?.name || 'Local Outlet'}.</span>
           </div>
         </div>
 
