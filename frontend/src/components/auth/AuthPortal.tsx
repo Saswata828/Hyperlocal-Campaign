@@ -544,25 +544,6 @@ export function AuthPortal({ initialMode = 'signin', onSuccess, onCancel, prefil
               <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
-            {/* Quick autofill helper */}
-            <div className="px-3 py-2 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between text-[11px] shadow-xs">
-              <div className="flex items-center gap-1.5 text-indigo-900 font-medium">
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                <span>Default: <strong className="text-indigo-950 font-semibold">saswatamishra828@gmail.com</strong></span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('saswatamishra828@gmail.com');
-                  setPassword('password');
-                }}
-                className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
-                id="btn-autofill-credentials"
-              >
-                Auto-fill
-              </button>
-            </div>
-
             <form onSubmit={handleSignIn} className="space-y-4 animate-fade-in" id="form-sign-in">
               <div className="space-y-3.5 pt-2">
               <div className="space-y-1">
