@@ -64,9 +64,10 @@ export const StoreMap: React.FC<StoreMapProps> = ({
       attributionControl: false,
     });
 
-    // Use beautiful dark themed tiles (CartoDB Dark Matter)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Use reliable OpenStreetMap tiles (100% free, no API key watermarks)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
     mapRef.current = map;

@@ -200,47 +200,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       queriesToTry.push(parts[parts.length - 1]);
     }
 
-    // 1. Query OpenStreetMap Nominatim API for real-time worldwide coordinate resolution
-    for (const qStr of queriesToTry) {
-      try {
-        const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-          params: {
-            q: qStr,
-            format: 'json',
-            limit: 1,
-            addressdetails: 1
-          },
-          headers: {
-            'Accept-Language': 'en',
-            'User-Agent': 'HyperlocalCampaignPlatformApp/1.0'
-          },
-          timeout: 4500
-        });
-
-        if (res.data && res.data.length > 0) {
-          const top = res.data[0];
-          const newLat = parseFloat(top.lat);
-          const newLng = parseFloat(top.lon);
-          if (!isNaN(newLat) && !isNaN(newLng)) {
-            setLatitude(newLat);
-            setLongitude(newLng);
-            if (updateAddress && !storeAddress) {
-              setStoreAddress(top.display_name);
-            }
-            setSuccessText(`Map pinned to ${qStr}!`);
-            setTimeout(() => setSuccessText(null), 3500);
-            setSearchingLocation(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn(`[GEOLOCATION] OpenStreetMap Nominatim lookup failed for "${qStr}":`, err);
-      }
-    }
-
-    // 2. Comprehensive regional dictionary fallback for instant lookup
+    // 1. Instant Curated Dictionary Matching for Regional Hubs & Verified Odisha Cities
     const q = clean.toLowerCase();
     const knownLocations: Record<string, [number, number]> = {
+      'bherampur': [19.3150, 84.7941],
+      'berhampur': [19.3150, 84.7941],
+      'brahmapur': [19.3150, 84.7941],
+      'behrampur': [19.3150, 84.7941],
       'madanpur': [20.2380, 85.7231],
       'badaraghunathpur': [20.2344, 85.7272],
       'jatni': [20.1610, 85.7067],
@@ -250,8 +216,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       'cuttack': [20.4625, 85.8828],
       'puri': [19.8135, 85.8312],
       'rourkela': [22.2604, 84.8536],
-      'berhampur': [19.3150, 84.7941],
-      'brahmapur': [19.3150, 84.7941],
       'balasore': [21.4934, 86.9135],
       'sambalpur': [21.4669, 83.9812],
       'budharaja': [21.4821, 83.9788],
@@ -301,6 +265,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         setTimeout(() => setSuccessText(null), 3000);
         setSearchingLocation(false);
         return;
+      }
+    }
+
+    // 2. Query OpenStreetMap Nominatim API for real-time worldwide coordinate resolution
+    for (const qStr of queriesToTry) {
+      try {
+        const res = await axios.get('https://nominatim.openstreetmap.org/search', {
+          params: {
+            q: qStr,
+            format: 'json',
+            limit: 1,
+            addressdetails: 1
+          },
+          headers: {
+            'Accept-Language': 'en',
+            'User-Agent': 'HyperlocalCampaignPlatformApp/1.0'
+          },
+          timeout: 4500
+        });
+
+        if (res.data && res.data.length > 0) {
+          const top = res.data[0];
+          const newLat = parseFloat(top.lat);
+          const newLng = parseFloat(top.lon);
+          if (!isNaN(newLat) && !isNaN(newLng)) {
+            setLatitude(newLat);
+            setLongitude(newLng);
+            if (updateAddress && !storeAddress) {
+              setStoreAddress(top.display_name);
+            }
+            setSuccessText(`Map pinned to ${qStr}!`);
+            setTimeout(() => setSuccessText(null), 3500);
+            setSearchingLocation(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn(`[GEOLOCATION] OpenStreetMap Nominatim lookup failed for "${qStr}":`, err);
       }
     }
 
