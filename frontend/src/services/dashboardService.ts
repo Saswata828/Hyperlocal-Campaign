@@ -211,19 +211,18 @@ class DashboardService {
             parsed = parsed.filter((s: any) =>
               s.id !== 'store-1' && s.id !== 'store-2' &&
               s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
-              s.name !== 'AdPulse Premium Express'
+              s.name !== 'AdPulse Premium Express' &&
+              s.name !== 'Demo Store'
             );
           } else if (key === 'adpulse_campaigns') {
             parsed = parsed.filter((c: any) =>
               c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+              !c.id?.startsWith('camp-onb-') &&
               c.name !== 'Diwali Festive Sparkle Mega Drive' &&
-              c.name !== 'Holi Organic Colors Carnival'
-            ).map((c: any) => {
-              if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
-                return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
-              }
-              return c;
-            });
+              c.name !== 'Holi Organic Colors Carnival' &&
+              c.name !== 'First Launch Celebration Wave' &&
+              c.name !== 'Local Launch Promo'
+            );
           } else if (key === 'adpulse_products') {
             parsed = parsed.filter((p: any) => !['prod-1', 'prod-2', 'prod-3', 'prod-4'].includes(p.id));
           } else if (key === 'adpulse_leads') {
@@ -260,7 +259,8 @@ class DashboardService {
         const cleanFetched = Array.isArray(fetched) ? fetched.filter((s: any) =>
           s.id !== 'store-1' && s.id !== 'store-2' &&
           s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
-          s.name !== 'AdPulse Premium Express'
+          s.name !== 'AdPulse Premium Express' &&
+          s.name !== 'Demo Store'
         ) : [];
         const cachedStr = JSON.stringify(cached);
         const fetchedStr = JSON.stringify(cleanFetched);
@@ -514,14 +514,12 @@ class DashboardService {
       apiService.getCampaigns().then((fetched) => {
         const cleanFetched = Array.isArray(fetched) ? fetched.filter((c: any) =>
           c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+          !c.id?.startsWith('camp-onb-') &&
           c.name !== 'Diwali Festive Sparkle Mega Drive' &&
-          c.name !== 'Holi Organic Colors Carnival'
-        ).map((c: any) => {
-          if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
-            return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
-          }
-          return c;
-        }) : [];
+          c.name !== 'Holi Organic Colors Carnival' &&
+          c.name !== 'First Launch Celebration Wave' &&
+          c.name !== 'Local Launch Promo'
+        ) : [];
         const cachedStr = JSON.stringify(cached);
         const fetchedStr = JSON.stringify(cleanFetched);
         if (cachedStr !== fetchedStr && Array.isArray(fetched)) {

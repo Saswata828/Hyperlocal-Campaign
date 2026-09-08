@@ -143,7 +143,8 @@ const getEmulatedStores = () => {
         return parsed.filter((s: any) =>
           s.id !== 'store-1' && s.id !== 'store-2' &&
           s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
-          s.name !== 'AdPulse Premium Express'
+          s.name !== 'AdPulse Premium Express' &&
+          s.name !== 'Demo Store'
         );
       }
     }
@@ -181,15 +182,13 @@ const getEmulatedCampaigns = () => {
       if (Array.isArray(parsed)) {
         return parsed.filter((c: any) =>
           c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+          !c.id?.startsWith('camp-onb-') &&
           c.name !== 'Diwali Festive Sparkle Mega Drive' &&
           c.name !== 'Holi Organic Colors Carnival' &&
-          c.name !== 'Summer Linen Fashion Warmup'
-        ).map((c: any) => {
-          if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
-            return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
-          }
-          return c;
-        });
+          c.name !== 'Summer Linen Fashion Warmup' &&
+          c.name !== 'First Launch Celebration Wave' &&
+          c.name !== 'Local Launch Promo'
+        );
       }
     }
   } catch (e) { }

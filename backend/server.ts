@@ -847,7 +847,8 @@ function getScopedStores(email: string) {
   userStores[cleanEmail] = userStores[cleanEmail].filter((s: any) =>
     s.id !== 'store-1' && s.id !== 'store-2' &&
     s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
-    s.name !== 'AdPulse Premium Express'
+    s.name !== 'AdPulse Premium Express' &&
+    s.name !== 'Demo Store'
   );
   if (userStores[cleanEmail].length !== beforeLen) {
     saveDbState();
@@ -880,22 +881,12 @@ function getScopedCampaigns(email: string) {
   const beforeLen = userCampaigns[cleanEmail].length;
   userCampaigns[cleanEmail] = userCampaigns[cleanEmail].filter((c: any) =>
     c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+    !c.id?.startsWith('camp-onb-') &&
     c.name !== 'Diwali Festive Sparkle Mega Drive' &&
-    c.name !== 'Holi Organic Colors Carnival'
-  ).map((c: any) => {
-    // Reset any unposted onboarding campaign that was given fake metrics
-    if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
-      return {
-        ...c,
-        status: 'Draft',
-        reach: 0,
-        engagement: 0,
-        leads: 0,
-        roi: 0
-      };
-    }
-    return c;
-  });
+    c.name !== 'Holi Organic Colors Carnival' &&
+    c.name !== 'First Launch Celebration Wave' &&
+    c.name !== 'Local Launch Promo'
+  );
   if (userCampaigns[cleanEmail].length !== beforeLen) {
     saveDbState();
   }
@@ -2720,35 +2711,6 @@ app.post("/api/onboarding/complete", authGuard, (req: any, res) => {
       status: "Active"
     };
     storesList.push(defaultStoreObj);
-  }
-
-  // Create default campaign from aiAnalysis
-  if (state.aiAnalysis) {
-    const campaignsList = getScopedCampaigns(email);
-    const campaignName = state.aiAnalysis.suggestedCampaignTypes?.[0]?.name || "Local Launch Promo";
-    const festivalMatched = state.aiAnalysis.recommendedFestivals?.[0] || "Opening Celebration";
-    const recommendedBudget = state.preferences?.budgetRange.includes("5,000") ? 7500 : 3500;
-
-    campaignsList.push({
-      id: `camp-onb-${Date.now()}`,
-      name: campaignName,
-      goal: state.preferences?.campaignGoal || "Brand Awareness",
-      festival: festivalMatched,
-      audience: `${state.audience?.gender || "All"} aged ${(state.audience?.ageGroups || []).join("/")}`,
-      radiusKm: state.location?.radiusKm || 5,
-      budget: recommendedBudget,
-      offer: state.aiAnalysis.suggestedOfferStrategy || "Flat Launch Discount",
-      tone: state.preferences?.tone || "Professional",
-      platforms: ["Instagram", "Facebook", "WhatsApp"],
-      status: "Draft",
-      reach: 0,
-      engagement: 0,
-      leads: 0,
-      roi: 0,
-      startDate: new Date().toISOString().split("T")[0],
-      generatedHeadline: `Exclusive opening special of ${state.store?.storeName || 'our brand-new outlet'}!`,
-      generatedCaption: `Visit us nearby ${state.store?.storeAddress || 'today'}! Aligned for ${festivalMatched} celebrations. ${state.aiAnalysis.businessSummary}`
-    });
   }
 
   saveDbState(email);
