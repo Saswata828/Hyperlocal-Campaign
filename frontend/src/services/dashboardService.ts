@@ -87,13 +87,27 @@ export interface Campaign {
 export interface FestivalInsight {
   id: string;
   name: string;
+  regionalName?: string;
+  region: 'All India' | 'Odisha & East' | 'North' | 'West' | 'South';
   date: string;
+  daysRemaining?: number;
+  categoryFit?: string[];
   historicalRoi: number;
   trendingProducts: string[];
+  trendingHashtags?: string[];
   recommendedOffer: string;
   aiTip: string;
   potentialReach: string;
   engagementMultiplier: number;
+  peakWindow?: string;
+  culturalHook?: string;
+  radarScores?: {
+    visualClicks: number;
+    whatsappShares: number;
+    storeFootfall: number;
+    leadConversion: number;
+    urgencyRate: number;
+  };
 }
 
 export interface CustomerLead {
@@ -132,48 +146,156 @@ const DEFAULT_CAMPAIGNS: Campaign[] = [];
 
 const DEFAULT_FESTIVALS: FestivalInsight[] = [
   {
-    id: 'fest-1',
-    name: 'Diwali',
-    date: 'November 12',
-    historicalRoi: 340,
-    trendingProducts: ['Festive Ethnic Garments', 'Gold Ornaments', 'Assorted Dryfault Hampers'],
-    recommendedOffer: 'Free LED Starlight string set with garments purchase worth INR 3,000+',
-    aiTip: 'High intent local traffic peaks 4 days prior. Schedule Instagram visual dynamic carousels using localized coordinates.',
-    potentialReach: '120k within 5km',
-    engagementMultiplier: 2.8
+    id: 'fest-nuakhai',
+    name: 'Nuakhai Juhar Celebration',
+    regionalName: 'ନୂଆଁଖାଇ ଜୁହାର (Western Odisha Agrarian Fest)',
+    region: 'Odisha & East',
+    date: 'September 20',
+    daysRemaining: 11,
+    categoryFit: ['Fashion & Apparel', 'Food & Sweets', 'Jewelry', 'Grocery'],
+    historicalRoi: 360,
+    trendingProducts: ['Sambalpuri Silk Handloom Saree', 'Traditional Kurta Sets', 'Local Arisa Pitha & Sweets', 'New Harvest Rice Gifting Hampers'],
+    trendingHashtags: ['#NuakhaiJuhar', '#SambalpuriHandloom', '#WesternOdishaFest', '#LocalWeaves', '#NuakhaiBhetghat'],
+    recommendedOffer: 'Flat 20% OFF on all authentic Sambalpuri Handlooms + Free Festive Gifting Box',
+    aiTip: 'Pre-festival family buying surges 5 days prior across Gole Bazar and regional craft corridors. Deploy localized dialect video hooks on WhatsApp and Instagram Reels.',
+    potentialReach: '145k within 10km',
+    engagementMultiplier: 3.2,
+    peakWindow: '4 days before Nuakhai through 2 days after',
+    culturalHook: 'Celebrate the sacred agrarian harvest with new traditional attire, greetings to elders, and family feasts.',
+    radarScores: { visualClicks: 95, whatsappShares: 98, storeFootfall: 92, leadConversion: 88, urgencyRate: 90 }
   },
   {
-    id: 'fest-2',
-    name: 'Holi',
-    date: 'March 14',
-    historicalRoi: 210,
-    trendingProducts: ['White Cotton Apparel', 'Sturdier Slip-ons', 'Organic Skin Protectants'],
-    recommendedOffer: 'Flat 15% discount + complimentary packet of Non-toxic Herbal Gulal',
-    aiTip: 'Prioritize WhatsApp broadcasts with clear local maps delivery pins. Focus campaigns within a tight 3km store radius.',
-    potentialReach: '65k within 5km',
-    engagementMultiplier: 1.9
-  },
-  {
-    id: 'fest-3',
-    name: 'New Year Special',
-    date: 'January 1',
-    historicalRoi: 280,
-    trendingProducts: ['Party Footwear', 'Sparkling Home Accessories', 'Unisex Gift Combinations'],
-    recommendedOffer: 'Buy 1 Get 50% Off on second item + midnight courier guarantee',
-    aiTip: 'High visual search spikes starting December 26. Run targeted radius offers to nearby office complexes.',
+    id: 'fest-raja',
+    name: 'Raja Parba Special',
+    regionalName: 'ରଜ ପର୍ବ (Festival of Swings & Womanhood)',
+    region: 'Odisha & East',
+    date: 'June 14',
+    daysRemaining: 278,
+    categoryFit: ['Fashion & Apparel', 'Food & Sweets', 'Jewelry', 'Beauty & Salon'],
+    historicalRoi: 310,
+    trendingProducts: ['Cotton Ikkat Salwar Suits', 'Silver Filigree (Tarakasi)', 'Poda Pitha Hampers', 'Festive Henna & Mehendi Kits'],
+    trendingHashtags: ['#RajaFestival', '#OdishaTradition', '#PodaPithaSpecial', '#RajaDoli', '#HandloomLove'],
+    recommendedOffer: 'Buy 2 Get 1 FREE on all Women Festive Ensembles + Free Henna Voucher',
+    aiTip: 'Target women 18-45 within 5km radius with swing visuals and celebration quotes. High WhatsApp group sharing multiplier.',
     potentialReach: '95k within 5km',
-    engagementMultiplier: 2.2
+    engagementMultiplier: 2.7,
+    peakWindow: '3 days across Pahili Raja, Raja Sankranti & Bhuin Dahana',
+    culturalHook: 'Celebrating womanhood, traditional swings, authentic Poda Pitha, and rich Odia handlooms.',
+    radarScores: { visualClicks: 88, whatsappShares: 94, storeFootfall: 90, leadConversion: 82, urgencyRate: 85 }
   },
   {
-    id: 'fest-4',
-    name: 'Eid Al-Fitr',
-    date: 'April 20',
-    historicalRoi: 295,
-    trendingProducts: ['Sheer Shalwar Suits', 'Premium Leather Mojris', 'Assorted Attar Collections'],
-    recommendedOffer: 'Complimentary luxury gift box + 15% VIP neighbor priority rebate',
-    aiTip: 'Engage local micro-influencers. High conversion rates witnessed on Facebook Local Groups directory tags.',
-    potentialReach: '80k within 5km',
-    engagementMultiplier: 2.4
+    id: 'fest-durga-puja',
+    name: 'Durga Puja & Navratri Grand Fest',
+    regionalName: 'ଦୁର୍ଗା ପୂଜା / শারদোৎসব / नवरात्रि',
+    region: 'Odisha & East',
+    date: 'October 18',
+    daysRemaining: 39,
+    categoryFit: ['Fashion & Apparel', 'Food & Sweets', 'Jewelry', 'Electronics'],
+    historicalRoi: 410,
+    trendingProducts: ['Dhakai Jamdani & Silk Sarees', 'Traditional Dhoti Kurta', 'Gold Plated Ornaments', 'Pandal Hopping Street Bites'],
+    trendingHashtags: ['#DurgaPujaVibes', '#PandalHopping', '#FestiveLook', '#PujorShopping', '#NavratriFashion'],
+    recommendedOffer: 'Mega Festive Splash: Flat 25% OFF + Surprise Gift on bills above INR 2,999',
+    aiTip: 'Highest physical footfall and late-night shopping of the year. Run geofenced Instagram dynamic ads with real-time countdowns.',
+    potentialReach: '280k within 12km',
+    engagementMultiplier: 3.8,
+    peakWindow: 'Mahalaya through Vijaya Dashami (10-day shopping frenzy)',
+    culturalHook: 'The grandest festive homecoming, pandal hopping in traditional finery, and celebratory feasts.',
+    radarScores: { visualClicks: 96, whatsappShares: 92, storeFootfall: 99, leadConversion: 94, urgencyRate: 95 }
+  },
+  {
+    id: 'fest-diwali',
+    name: 'Diwali & Dhanteras Mega Drive',
+    regionalName: 'दीपावली एवं धनतेरस / ଦୀପାବଳି',
+    region: 'All India',
+    date: 'November 12',
+    daysRemaining: 64,
+    categoryFit: ['Jewelry', 'Electronics', 'Home Decor', 'Fashion & Apparel', 'Grocery'],
+    historicalRoi: 450,
+    trendingProducts: ['22K Gold & Diamond Jewelry', 'Designer LED Strip Lights', 'Luxury Sweet & Dryfruit Hampers', 'Festive Ethnic Kurtis'],
+    trendingHashtags: ['#DiwaliSparkle', '#DhanterasShopping', '#GiftingSeason', '#LightUpYourHome', '#DiwaliDealsNearby'],
+    recommendedOffer: 'Pre-book Gold with 0% Making Charges + Complimentary 24-Piece Diya Gift Set',
+    aiTip: 'High-intent digital gift bookings start 10 days before Dhanteras. Focus ads on WhatsApp direct chat and localized map directions.',
+    potentialReach: '320k within 15km',
+    engagementMultiplier: 4.1,
+    peakWindow: '7 days leading up to Diwali night',
+    culturalHook: 'Auspicious prosperity purchases, lighting lamps, and premium gifting for loved ones.',
+    radarScores: { visualClicks: 98, whatsappShares: 90, storeFootfall: 97, leadConversion: 96, urgencyRate: 98 }
+  },
+  {
+    id: 'fest-holi',
+    name: 'Holi Colors Carnival',
+    regionalName: 'रंगों का त्यौहार - होली / ହୋଲି',
+    region: 'All India',
+    date: 'March 14',
+    daysRemaining: 186,
+    categoryFit: ['Fashion & Apparel', 'Food & Sweets', 'Grocery', 'Beauty & Salon'],
+    historicalRoi: 240,
+    trendingProducts: ['White Cotton Chikan Kurtas', 'Herbal Non-Toxic Gulal Sets', 'Gujiya & Thandai Sweets', 'Waterproof Accessories'],
+    trendingHashtags: ['#HoliFest', '#OrganicColors', '#WhiteInStyle', '#HoliCelebrations', '#LocalHoliDeals'],
+    recommendedOffer: 'Flat 20% OFF on all White Apparel + Free 4-Pack Herbal Organic Gulal',
+    aiTip: 'Young adults and families purchase within 48 hours of festival day. Highlight same-day neighborhood delivery.',
+    potentialReach: '110k within 6km',
+    engagementMultiplier: 2.5,
+    peakWindow: '3 days prior to Holika Dahan',
+    culturalHook: 'Joyful celebration of colors, spring renewal, sweets, and community get-togethers.',
+    radarScores: { visualClicks: 89, whatsappShares: 95, storeFootfall: 84, leadConversion: 80, urgencyRate: 92 }
+  },
+  {
+    id: 'fest-ganesh',
+    name: 'Ganesh Utsav Celebration',
+    regionalName: 'गणेशोत्सव / ବିନାୟକ ଚତୁର୍ଥୀ',
+    region: 'West',
+    date: 'September 19',
+    daysRemaining: 10,
+    categoryFit: ['Food & Sweets', 'Home Decor', 'Jewelry', 'Fashion & Apparel'],
+    historicalRoi: 320,
+    trendingProducts: ['Artisanal Modak Boxes', 'Eco-friendly Pooja Decor', 'Traditional Silk Dhotis', 'Brass Pooja Articles'],
+    trendingHashtags: ['#GaneshUtsav', '#ModakSpecial', '#BappaMoraya', '#FestiveDecor', '#LocalStoreDeals'],
+    recommendedOffer: 'Buy 1kg Premium Modak Box and get 25% OFF on Festive Sweets Assortment',
+    aiTip: 'Local community Mandals drive huge neighborhood demand. Target residential societies in 3km store vicinity.',
+    potentialReach: '160k within 8km',
+    engagementMultiplier: 3.0,
+    peakWindow: '2 days before installation through 10-day Visarjan period',
+    culturalHook: 'Welcoming Lord Ganesha with devotion, eco-friendly celebrations, and sweet offerings.',
+    radarScores: { visualClicks: 91, whatsappShares: 93, storeFootfall: 95, leadConversion: 86, urgencyRate: 88 }
+  },
+  {
+    id: 'fest-eid',
+    name: 'Eid Festive Splendor',
+    regionalName: 'عيد الفطر المبارك (Eid Al-Fitr)',
+    region: 'All India',
+    date: 'April 10',
+    daysRemaining: 213,
+    categoryFit: ['Fashion & Apparel', 'Food & Sweets', 'Jewelry', 'Beauty & Salon'],
+    historicalRoi: 310,
+    trendingProducts: ['Embroidered Shararas & Kurta Sets', 'Traditional Sheer Khurma Ingredients', 'Non-Alcoholic Attar Perfumes', 'Designer Footwear'],
+    trendingHashtags: ['#EidMubarak', '#EidFashion', '#FestiveElegance', '#LocalBoutique', '#EidShopping'],
+    recommendedOffer: 'Complimentary Luxury Attar & Gift Box with purchases above INR 2,499',
+    aiTip: 'Night market footfall surges during Chaand Raat. Run evening ad broadcasts between 7 PM and 11 PM.',
+    potentialReach: '130k within 7km',
+    engagementMultiplier: 2.9,
+    peakWindow: 'Last week of Ramadan through Chaand Raat',
+    culturalHook: 'Celebrating gratitude, community bonding, elegant new garments, and delicious family feasts.',
+    radarScores: { visualClicks: 92, whatsappShares: 89, storeFootfall: 93, leadConversion: 87, urgencyRate: 91 }
+  },
+  {
+    id: 'fest-newyear',
+    name: 'New Year & Winter Flash',
+    regionalName: 'Happy New Year & Winter Clearance',
+    region: 'All India',
+    date: 'January 1',
+    daysRemaining: 114,
+    categoryFit: ['Fashion & Apparel', 'Electronics', 'Food & Dining', 'Beauty & Salon'],
+    historicalRoi: 290,
+    trendingProducts: ['Glamorous Party Attire', 'Bluetooth Audio & Gadgets', 'Winter Fashion Jackets', 'Gourmet Party Platters'],
+    trendingHashtags: ['#NewYearDeals', '#PartyReady', '#FlashSaleNearby', '#Welcome2027', '#LocalShopping'],
+    recommendedOffer: 'Buy 1 Get 1 at 50% OFF on all Lifestyle & Winter Collections',
+    aiTip: 'High visual search spikes starting December 26. Run targeted radius offers to nearby office complexes and youth hangouts.',
+    potentialReach: '125k within 8km',
+    engagementMultiplier: 2.6,
+    peakWindow: 'December 27 through January 2',
+    culturalHook: 'Ringing in the New Year with parties, wardrobe revamps, resolution gifts, and winter specials.',
+    radarScores: { visualClicks: 94, whatsappShares: 87, storeFootfall: 88, leadConversion: 84, urgencyRate: 89 }
   }
 ];
 
