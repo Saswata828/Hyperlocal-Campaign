@@ -2633,8 +2633,8 @@ app.post("/api/onboarding/complete", authGuard, (req: any, res) => {
       category: state.business?.category || "Clothing",
       hours: state.store.openingHours || "10:00 AM - 10:00 PM",
       radiusTargetKm: state.location.radiusKm || 5,
-      latitude: state.location.latitude || 21.4669,
-      longitude: state.location.longitude || 83.9812,
+      latitude: state.location.latitude ?? 21.4669,
+      longitude: state.location.longitude ?? 83.9812,
       status: "Active"
     };
     storesList.push(defaultStoreObj);

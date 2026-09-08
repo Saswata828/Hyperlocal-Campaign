@@ -869,15 +869,35 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         </button>
                       </div>
 
-                      {/* Coordinates Readout */}
-                      <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2.5 rounded-xl border border-slate-200 font-mono text-[10.5px] text-slate-600">
+                      {/* Coordinates Readout & Direct Manual Coordinates Input */}
+                      <div className="grid grid-cols-2 gap-2 bg-slate-100/90 p-2.5 rounded-xl border border-slate-200 text-slate-700">
                         <div>
-                          <span className="text-[8px] text-slate-450 block font-bold uppercase">Latitude</span>
-                          <strong className="text-slate-800">{latitude.toFixed(5)}</strong>
+                          <label className="text-[8.5px] text-slate-500 block font-black uppercase mb-1 tracking-wider">Latitude (Manual/GPS)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={latitude}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) setLatitude(val);
+                            }}
+                            className="w-full bg-white border border-slate-300 focus:border-indigo-500 focus:outline-none rounded-lg px-2.5 py-1 text-slate-900 font-mono font-bold text-xs"
+                            placeholder="e.g. 20.2961"
+                          />
                         </div>
                         <div>
-                          <span className="text-[8px] text-slate-450 block font-bold uppercase">Longitude</span>
-                          <strong className="text-slate-800">{longitude.toFixed(5)}</strong>
+                          <label className="text-[8.5px] text-slate-500 block font-black uppercase mb-1 tracking-wider">Longitude (Manual/GPS)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={longitude}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) setLongitude(val);
+                            }}
+                            className="w-full bg-white border border-slate-300 focus:border-indigo-500 focus:outline-none rounded-lg px-2.5 py-1 text-slate-900 font-mono font-bold text-xs"
+                            placeholder="e.g. 85.8245"
+                          />
                         </div>
                       </div>
 
