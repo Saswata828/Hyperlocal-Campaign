@@ -33,8 +33,10 @@ import {
   LogOut,
   SlidersHorizontal,
   Flame,
-  LayoutDashboard
+  LayoutDashboard,
+  Loader2
 } from 'lucide-react';
+import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/api';
 import { StoreMap } from './StoreMap';
@@ -71,10 +73,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [storeType, setStoreType] = React.useState<'Single Store' | 'Multiple Stores'>('Single Store');
 
   // STEP 3: Store Location Setup (OpenStreetMap + Leaflet)
-  const [latitude, setLatitude] = React.useState(21.4669); // Sambalpur Default
+  const [latitude, setLatitude] = React.useState(21.4669); // Default placeholder
   const [longitude, setLongitude] = React.useState(83.9812);
   const [radiusTargetKm, setRadiusTargetKm] = React.useState(5);
-  const [searchQuery, setSearchQuery] = React.useState('Sambalpur, Odisha');
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   // STEP 4: Target Audience
   const [ageGroups, setAgeGroups] = React.useState<string[]>(['25-34', '35-44']);
@@ -134,13 +136,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             setContactNumber(s.store.contactNumber || '');
             setOpeningHours(s.store.openingHours || '');
             setStoreType(s.store.storeType || 'Single Store');
+            if (s.store.storeAddress) {
+              setSearchQuery(s.store.storeAddress);
+            }
           } else {
             // Pre-fill store name from business name by default
             setStoreName(s.business?.businessName || currentUser?.businessName || '');
           }
-          if (s.location) {
-            setLatitude(s.location.latitude || 21.4669);
-            setLongitude(s.location.longitude || 83.9812);
+          if (s.location && s.location.latitude && s.location.longitude) {
+            setLatitude(s.location.latitude);
+            setLongitude(s.location.longitude);
             setRadiusTargetKm(s.location.radiusKm || 5);
           }
           if (s.audience) {
@@ -176,67 +181,163 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     restoreDraft();
   }, [currentUser]);
 
-  // Geocode Search simulation (For OSM)
+  const [searchingLocation, setSearchingLocation] = React.useState(false);
+
+  // Dynamic OpenStreetMap Geocoding with Regional Offline Fallback
+  const geocodeAddress = async (queryText: string, updateAddress = false) => {
+    if (!queryText || !queryText.trim()) return;
+    const clean = queryText.trim();
+    setSearchingLocation(true);
+
+    // Queries to attempt in order: full string, then sub-parts (e.g. area + city)
+    const queriesToTry = [clean];
+    const parts = clean.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      queriesToTry.push(parts.slice(1).join(', '));
+      if (parts.length > 2) {
+        queriesToTry.push(parts.slice(parts.length - 2).join(', '));
+      }
+      queriesToTry.push(parts[parts.length - 1]);
+    }
+
+    // 1. Query OpenStreetMap Nominatim API for real-time worldwide coordinate resolution
+    for (const qStr of queriesToTry) {
+      try {
+        const res = await axios.get('https://nominatim.openstreetmap.org/search', {
+          params: {
+            q: qStr,
+            format: 'json',
+            limit: 1,
+            addressdetails: 1
+          },
+          headers: {
+            'Accept-Language': 'en',
+            'User-Agent': 'HyperlocalCampaignPlatformApp/1.0'
+          },
+          timeout: 4500
+        });
+
+        if (res.data && res.data.length > 0) {
+          const top = res.data[0];
+          const newLat = parseFloat(top.lat);
+          const newLng = parseFloat(top.lon);
+          if (!isNaN(newLat) && !isNaN(newLng)) {
+            setLatitude(newLat);
+            setLongitude(newLng);
+            if (updateAddress && !storeAddress) {
+              setStoreAddress(top.display_name);
+            }
+            setSuccessText(`Map pinned to ${qStr}!`);
+            setTimeout(() => setSuccessText(null), 3500);
+            setSearchingLocation(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn(`[GEOLOCATION] OpenStreetMap Nominatim lookup failed for "${qStr}":`, err);
+      }
+    }
+
+    // 2. Comprehensive regional dictionary fallback for instant lookup
+    const q = clean.toLowerCase();
+    const knownLocations: Record<string, [number, number]> = {
+      'madanpur': [20.2380, 85.7231],
+      'badaraghunathpur': [20.2344, 85.7272],
+      'jatni': [20.1610, 85.7067],
+      'khurda': [20.1817, 85.6212],
+      'gita': [20.2380, 85.7231],
+      'bhubaneswar': [20.2961, 85.8245],
+      'cuttack': [20.4625, 85.8828],
+      'puri': [19.8135, 85.8312],
+      'rourkela': [22.2604, 84.8536],
+      'berhampur': [19.3150, 84.7941],
+      'brahmapur': [19.3150, 84.7941],
+      'balasore': [21.4934, 86.9135],
+      'sambalpur': [21.4669, 83.9812],
+      'budharaja': [21.4821, 83.9788],
+      'shastri': [21.4641, 83.9772],
+      'khetrajpur': [21.4883, 83.9610],
+      'gole bazar': [21.4691, 83.9834],
+      'delhi': [28.6139, 77.2090],
+      'connaught place': [28.6304, 77.2177],
+      'new delhi': [28.6139, 77.2090],
+      'noida': [28.5355, 77.3910],
+      'gurgaon': [28.4595, 77.0266],
+      'gurugram': [28.4595, 77.0266],
+      'mumbai': [19.0760, 72.8777],
+      'bandra': [19.0596, 72.8295],
+      'andheri': [19.1136, 72.8697],
+      'kolkata': [22.5726, 88.3639],
+      'salt lake': [22.5868, 88.4178],
+      'howrah': [22.5958, 88.2636],
+      'bengaluru': [12.9716, 77.5946],
+      'bangalore': [12.9716, 77.5946],
+      'indiranagar': [12.9784, 77.6408],
+      'koramangala': [12.9352, 77.6245],
+      'whitefield': [12.9698, 77.7500],
+      'hyderabad': [17.3850, 78.4867],
+      'hitech city': [17.4474, 78.3762],
+      'secunderabad': [17.4399, 78.4983],
+      'chennai': [13.0827, 80.2707],
+      'pune': [18.5204, 73.8567],
+      'ahmedabad': [23.0225, 72.5714],
+      'jaipur': [26.9124, 75.7873],
+      'lucknow': [26.8467, 80.9462],
+      'patna': [25.5941, 85.1376],
+      'ranchi': [23.3441, 85.3096],
+      'chandigarh': [30.7333, 76.7794],
+      'indore': [22.7196, 75.8577],
+      'bhopal': [23.2599, 77.4126],
+      'surat': [21.1702, 72.8311],
+      'nagpur': [21.1458, 79.0882],
+      'visakhapatnam': [17.6868, 83.2185]
+    };
+
+    for (const [key, coords] of Object.entries(knownLocations)) {
+      if (q.includes(key)) {
+        setLatitude(coords[0]);
+        setLongitude(coords[1]);
+        setSuccessText(`Map location pinned to ${clean}!`);
+        setTimeout(() => setSuccessText(null), 3000);
+        setSearchingLocation(false);
+        return;
+      }
+    }
+
+    setSuccessText("Could not resolve location automatically. You can click on the map or use Auto-GPS.");
+    setTimeout(() => setSuccessText(null), 4000);
+    setSearchingLocation(false);
+  };
+
   const triggerMapSearch = () => {
     if (!searchQuery.trim()) return;
-    const queryLower = searchQuery.toLowerCase();
-    
-    // Smooth lookup for locations
-    if (queryLower.includes('sambalpur')) {
-      setLatitude(21.4669);
-      setLongitude(83.9812);
-      if (!storeAddress) setStoreAddress('Gole Bazar, Sambalpur, Odisha, 768001');
-    } else if (queryLower.includes('budharaja')) {
-      setLatitude(21.4821);
-      setLongitude(83.9788);
-      if (!storeAddress) setStoreAddress('Budharaja Main Road, Sambalpur, Odisha, 768004');
-    } else if (queryLower.includes('shastri')) {
-      setLatitude(21.4641);
-      setLongitude(83.9772);
-      if (!storeAddress) setStoreAddress('Shastri Nagar, Sambalpur, Odisha, 768002');
-    } else if (queryLower.includes('khetrajpur')) {
-      setLatitude(21.4883);
-      setLongitude(83.9610);
-      if (!storeAddress) setStoreAddress('Railway Colony Road, Khetrajpur, Sambalpur, 768003');
-    } else if (queryLower.includes('delhi')) {
-      setLatitude(28.6304);
-      setLongitude(77.2177);
-      if (!storeAddress) setStoreAddress('Connaught Place, New Delhi, Delhi, 110001');
-    } else if (queryLower.includes('mumbai')) {
-      setLatitude(19.0596);
-      setLongitude(72.8295);
-      if (!storeAddress) setStoreAddress('Bandra Reclamation, West Mumbai, Maharashtra, 400050');
-    } else {
-      const latOffset = (Math.random() - 0.5) * 0.04;
-      const lngOffset = (Math.random() - 0.5) * 0.04;
-      setLatitude(21.4669 + latOffset);
-      setLongitude(83.9812 + lngOffset);
-      if (!storeAddress) setStoreAddress(`${searchQuery}, Local Ward, 768001`);
-    }
-    setSuccessText("Map location shifted successfully!");
-    setTimeout(() => setSuccessText(null), 3000);
+    geocodeAddress(searchQuery, true);
   };
 
   const handleDetectLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude);
-          setLongitude(position.coords.longitude);
-          setStoreAddress(`Live Position Pin (${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)})`);
-          setSuccessText("Device coordinates resolved!");
-          setTimeout(() => setSuccessText(null), 3000);
-        },
-        () => {
-          // Fallback to Sambalpur Town
-          setLatitude(21.4691);
-          setLongitude(83.9834);
-          setStoreAddress('Gole Bazar, Sambalpur, Odisha, 768001');
-          setErrorText("Geolocation rejected. Falling back to default Sambalpur headquarters.");
-          setTimeout(() => setErrorText(null), 4000);
-        }
-      );
+    if (!navigator.geolocation) {
+      setErrorText("Geolocation not supported by this browser.");
+      return;
     }
+    setSearchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setLatitude(lat);
+        setLongitude(lng);
+        setSuccessText(`GPS coordinates resolved: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        setTimeout(() => setSuccessText(null), 3500);
+        setSearchingLocation(false);
+      },
+      (err) => {
+        console.warn("GPS Geolocation error:", err);
+        setErrorText("Could not detect device GPS. Please type your city/area in the search box.");
+        setTimeout(() => setErrorText(null), 4000);
+        setSearchingLocation(false);
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    );
   };
 
   // STEP BY STEP SAVE ROUTINES
@@ -283,6 +384,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         openingHours,
         storeType
       });
+
+      // Synchronize address into Step 3 location & trigger geocode
+      if (storeAddress.trim()) {
+        setSearchQuery(storeAddress.trim());
+        geocodeAddress(storeAddress.trim());
+      }
+
       setStep(3);
     } catch (err: any) {
       setErrorText(err.message || "Failed to save store details.");
@@ -728,7 +836,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             <input 
                               type="text" 
                               className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:outline-none rounded-xl pl-9 pr-3 py-2 text-xs font-semibold" 
-                              placeholder="e.g. Gole Bazar, Sambalpur"
+                              placeholder="e.g. Badaraghunathpur, Bhubaneswar or Connaught Place, Delhi"
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && triggerMapSearch()}
@@ -737,9 +845,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           <button
                             type="button"
                             onClick={triggerMapSearch}
-                            className="bg-indigo-600 text-white text-[10px] font-black px-3.5 py-2 rounded-xl hover:bg-indigo-700 cursor-pointer text-center"
+                            disabled={searchingLocation}
+                            className="bg-indigo-600 text-white text-[10px] font-black px-3.5 py-2 rounded-xl hover:bg-indigo-700 cursor-pointer text-center disabled:opacity-60 flex items-center justify-center min-w-[54px]"
                           >
-                            Set
+                            {searchingLocation ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Set"}
                           </button>
                         </div>
                       </div>
@@ -748,9 +857,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         <button
                           type="button"
                           onClick={handleDetectLocation}
-                          className="bg-slate-200 text-slate-705 text-[10px] font-black px-3.5 py-2 rounded-xl hover:bg-slate-300 flex items-center justify-center gap-1.5 flex-grow cursor-pointer"
+                          disabled={searchingLocation}
+                          className="bg-slate-200 text-slate-705 text-[10px] font-black px-3.5 py-2 rounded-xl hover:bg-slate-300 flex items-center justify-center gap-1.5 flex-grow cursor-pointer disabled:opacity-60"
                         >
-                          <Locate className="h-3.5 w-3.5 text-indigo-600" /> Auto-GPS Detect Location
+                          {searchingLocation ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                          ) : (
+                            <Locate className="h-3.5 w-3.5 text-indigo-600" />
+                          )}
+                          Auto-GPS Detect Location
                         </button>
                       </div>
 
