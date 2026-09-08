@@ -125,145 +125,10 @@ export interface DashboardNotification {
   read: boolean;
 }
 
-// Default initial database templates
-const DEFAULT_STORES: Store[] = [
-  {
-    id: 'store-1',
-    name: 'AdPulse Hyperlocal Hub - Main Branch',
-    address: '102, Connaught Place, New Delhi, 110001',
-    phone: '+91 98765 43210',
-    category: 'SaaS & Ad Services',
-    hours: '09:00 AM - 08:00 PM',
-    radiusTargetKm: 5,
-    status: 'Active',
-    latitude: 28.6304,
-    longitude: 77.2177
-  },
-  {
-    id: 'store-2',
-    name: 'AdPulse Premium Express',
-    address: '405, Sector 5, Salt Lake, Kolkata, 700091',
-    phone: '+91 98765 11223',
-    category: 'Retail Apparel',
-    hours: '10:00 AM - 09:30 PM',
-    radiusTargetKm: 8,
-    status: 'Active',
-    latitude: 22.5726,
-    longitude: 88.4339
-  }
-];
-
-const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'prod-1',
-    name: 'Summer Linen Kurti',
-    category: 'Fashion & Apparel',
-    price: 1499,
-    discount: 15,
-    stock: 120,
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&q=80',
-    status: 'In Stock'
-  },
-  {
-    id: 'prod-2',
-    name: 'Designer Leather Sandals',
-    category: 'Footwear',
-    price: 3499,
-    discount: 20,
-    stock: 8,
-    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=150&h=150&fit=crop&q=80',
-    status: 'Low Stock'
-  },
-  {
-    id: 'prod-3',
-    name: 'Festive Gold Jhumka Earrings',
-    category: 'Jewelry',
-    price: 8999,
-    discount: 5,
-    stock: 45,
-    image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=150&h=150&fit=crop&q=80',
-    status: 'In Stock'
-  },
-  {
-    id: 'prod-4',
-    name: 'Handcrafted Soy Scented Candle Set',
-    category: 'Home Decor',
-    price: 799,
-    discount: 30,
-    stock: 0,
-    image: 'https://images.unsplash.com/photo-1603006905591-4b56c453794a?w=150&h=150&fit=crop&q=80',
-    status: 'Out of Stock'
-  }
-];
-
-const DEFAULT_CAMPAIGNS: Campaign[] = [
-  {
-    id: 'camp-1',
-    name: 'Diwali Festive Sparkle Mega Drive',
-    goal: 'Increase Offline Footfall',
-    festival: 'Diwali Celebration',
-    audience: 'Families & Festive Shoppers',
-    radiusKm: 6,
-    budget: 45000,
-    offer: 'Buy 2 Get 1 Free on all Festive Apparel + Free Diya Set',
-    tone: 'Joyful & Warm',
-    platforms: ['Instagram', 'Facebook', 'WhatsApp'],
-    status: 'Completed',
-    reach: 58400,
-    engagement: 14200,
-    leads: 812,
-    roi: 380,
-    startDate: '2025-11-10',
-    generatedCaption: '✨ Illuminate your home and wardrobe this festive season! Celebrate the festival of lights with AdPulse Premium\'s Diwali Special! Buy any 2 outfits and claim a 3rd garments completely FREE. Visit us this weekend to collect your complimentary handmade Diya set. 🪔 Hurry, offers valid for nearby residents only! #DiwaliSparkle #HyperlocalOffers',
-    generatedHeadline: '🪔 Premium Diwali Sparkle Discount: Buy 2 Get 1 FREE!',
-    generatedCtas: ['Visit Stores Nearby', 'Claim Festive Voucher', 'Chat with Boutique on WhatsApp'],
-    generatedHashtags: ['#DiwaliDiscount', '#HyperlocalShop', '#FestiveLook', '#ConnaughtPlaceSpecial']
-  },
-  {
-    id: 'camp-2',
-    name: 'Holi Organic Colors Carnival',
-    goal: 'Boost Online Orders & Awareness',
-    festival: 'Holi Carnival',
-    audience: 'Youth & Young Professionals',
-    radiusKm: 10,
-    budget: 25000,
-    offer: 'Flat 20% off on Footwear + Free Herbal Gulal packets',
-    tone: 'Playful & Vibrant',
-    platforms: ['Instagram', 'Twitter/X'],
-    status: 'Active',
-    reach: 18200,
-    engagement: 3900,
-    leads: 295,
-    roi: 185,
-    startDate: '2026-03-12',
-    generatedCaption: '🎨 Splash of comfort, dash of color! Get ready for Holi with our premium designer footwear flat 20% off. Every order comes containing organic, toxin-free herbal colors to keep your celebrations clean and vibrant! Walk in or order online for fast hyperlocal same-day delivery. 🗺️ #HoliCarnival #OrganicHoli #DesignerShoes',
-    generatedHeadline: '🎨 Step Into Holi: 20% Off Footwear + Free Herbal Colors!',
-    generatedCtas: ['Order Now for Same-Day Delivery', 'Unlock Holi Promo Code'],
-    generatedHashtags: ['#OrganicFest', '#HoliDeals', '#FashionWalks', '#LocalDelivery']
-  },
-  {
-    id: 'camp-3',
-    name: 'Akshaya Tritiya Gold Pre-booking',
-    goal: 'Acquire High-Value Premium Leads',
-    festival: 'Akshaya Tritiya',
-    audience: 'High Net-worth Individuals',
-    radiusKm: 15,
-    budget: 75000,
-    offer: 'Zero Making Charges on Gold Jewelry Booking',
-    tone: 'Premium & Trustworthy',
-    platforms: ['Facebook', 'WhatsApp', 'Instagram'],
-    status: 'Scheduled',
-    reach: 0,
-    engagement: 0,
-    leads: 0,
-    roi: 0,
-    startDate: '2026-05-30',
-    generatedCaption: '⭐ Secure your fortune on this Akshaya Tritiya! Pre-book from our pristine collection of conflict-free premium Gold jewelry and pay exactly ZERO making charges. Lock in the metal value today and pick up at your convenience on the auspicious day. Exclusive entry passes for verified neighbors. 💰 #AkshayaGold #NoMakingCharges',
-    generatedHeadline: '🏆 Akshaya Tritiya Exclusive: Pre-book Gold with 0% Making Fee!',
-    generatedCtas: ['Reserve VIP Viewing slot', 'Call Private Jeweller', 'Download Gold Catalog'],
-    generatedHashtags: ['#GoldPrebook', '#AuspiciousDeals', '#FineJewelry', '#LocalGoldSuite']
-  }
-];
+// Default initial database templates (Clean initialized state for genuine merchant records)
+const DEFAULT_STORES: Store[] = [];
+const DEFAULT_PRODUCTS: Product[] = [];
+const DEFAULT_CAMPAIGNS: Campaign[] = [];
 
 const DEFAULT_FESTIVALS: FestivalInsight[] = [
   {
@@ -312,75 +177,8 @@ const DEFAULT_FESTIVALS: FestivalInsight[] = [
   }
 ];
 
-const DEFAULT_LEADS: CustomerLead[] = [
-  {
-    id: 'lead-1',
-    name: 'Rajesh Malhotra',
-    email: 'rajesh.malhotra@gmail.com',
-    phone: '+91 91234 56780',
-    source: 'Instagram Ad (Diwali Campaign)',
-    status: 'Converted',
-    inquiry: 'Interested in booking Summer Linen Kurti for family gifting. Please contact details and confirm bulk order rebate.',
-    date: '2026-05-18'
-  },
-  {
-    id: 'lead-2',
-    name: 'Pooja Sen',
-    email: 'pooja.sen@rediffmail.com',
-    phone: '+91 93345 61728',
-    source: 'WhatsApp Broadcast',
-    status: 'New',
-    inquiry: 'Can you deliver the Festive Gold Jhumka Earrings securely to Salt Lake Sector 3? Do you have certificate verification?',
-    date: '2026-05-20'
-  },
-  {
-    id: 'lead-3',
-    name: 'Vikram Grover',
-    email: 'vgrover@outlook.com',
-    phone: '+91 98877 66554',
-    source: 'Facebook Campaign',
-    status: 'In Progress',
-    inquiry: 'Do you open before 09:30 AM? Need to pick up custom designer leather sandals as an emergency gift package.',
-    date: '2026-05-19'
-  },
-  {
-    id: 'lead-4',
-    name: 'Amina Khatun',
-    email: 'amina.k@gmail.com',
-    phone: '+91 97755 44221',
-    source: 'Organic Local Search',
-    status: 'New',
-    inquiry: 'Sent inquiry for handcrafted soy candles. Are they chemical-free and how many hours of continuous burn is expected?',
-    date: '2026-05-21'
-  }
-];
-
-const DEFAULT_NOTIFICATIONS: DashboardNotification[] = [
-  {
-    id: 'notif-1',
-    title: 'Ad Campaign Diwali Sparkle completed successfully',
-    message: 'Finished Diwali Campaign reached 58,400 customers nearby CP, generating 812 inquiries high-intent leads.',
-    type: 'success',
-    timestamp: '2 hours ago',
-    read: false
-  },
-  {
-    id: 'notif-2',
-    title: 'Low Stock Alert on Designer Leather Sandals',
-    message: 'Stock currently down to exactly 8 pairs. Update inventory fast to keep campaigns floating!',
-    type: 'alert',
-    timestamp: '1 day ago',
-    read: false
-  },
-  {
-    id: 'notif-3',
-    title: 'Recommendation: Akshaya Tritiya in 9 days',
-    message: 'Start setting up Akshaya Tritiya campaign generators. Ideal window for pre-booking leads is now!',
-    type: 'recommendation',
-    timestamp: '2 days ago',
-    read: true
-  }
-];
+const DEFAULT_LEADS: CustomerLead[] = [];
+const DEFAULT_NOTIFICATIONS: DashboardNotification[] = [];
 
 class DashboardService {
   public async syncFromFirestore(userId: string): Promise<void> {
@@ -405,9 +203,36 @@ class DashboardService {
   private getStorageItem<T>(key: string, defaultValue: T): T {
     try {
       const scopedKey = this.getScopedKey(key);
-      const stored = localStorage.getItem(scopedKey);
+      const stored = localStorage.getItem(scopedKey) || localStorage.getItem(key);
       if (stored) {
-        return JSON.parse(stored);
+        let parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          if (key === 'adpulse_stores') {
+            parsed = parsed.filter((s: any) =>
+              s.id !== 'store-1' && s.id !== 'store-2' &&
+              s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
+              s.name !== 'AdPulse Premium Express'
+            );
+          } else if (key === 'adpulse_campaigns') {
+            parsed = parsed.filter((c: any) =>
+              c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+              c.name !== 'Diwali Festive Sparkle Mega Drive' &&
+              c.name !== 'Holi Organic Colors Carnival'
+            ).map((c: any) => {
+              if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
+                return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
+              }
+              return c;
+            });
+          } else if (key === 'adpulse_products') {
+            parsed = parsed.filter((p: any) => !['prod-1', 'prod-2', 'prod-3', 'prod-4'].includes(p.id));
+          } else if (key === 'adpulse_leads') {
+            parsed = parsed.filter((l: any) => !['lead-1', 'lead-2', 'lead-3', 'lead-4'].includes(l.id));
+          } else if (key === 'adpulse_notifs') {
+            parsed = parsed.filter((n: any) => !['notif-1', 'notif-2', 'notif-3'].includes(n.id));
+          }
+        }
+        return parsed as T;
       }
     } catch (e) {
       console.warn('Dashboard storage retrieve failed: ', e);
@@ -432,10 +257,15 @@ class DashboardService {
     const token = localStorage.getItem("_hyperlocal_access_token");
     if (token) {
       apiService.getStores().then((fetched) => {
+        const cleanFetched = Array.isArray(fetched) ? fetched.filter((s: any) =>
+          s.id !== 'store-1' && s.id !== 'store-2' &&
+          s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
+          s.name !== 'AdPulse Premium Express'
+        ) : [];
         const cachedStr = JSON.stringify(cached);
-        const fetchedStr = JSON.stringify(fetched);
-        if (cachedStr !== fetchedStr && fetched && fetched.length > 0) {
-          this.setStorageItem('adpulse_stores', fetched);
+        const fetchedStr = JSON.stringify(cleanFetched);
+        if (cachedStr !== fetchedStr && Array.isArray(fetched)) {
+          this.setStorageItem('adpulse_stores', cleanFetched);
           notifyDashboardListeners();
         }
       }).catch(e => console.warn("[BACKGROUND SYNC] Stores background fetch failed, using local caching fallback:", e));
@@ -550,10 +380,13 @@ class DashboardService {
     const token = localStorage.getItem("_hyperlocal_access_token");
     if (token) {
       apiService.getProducts().then((fetched) => {
+        const cleanFetched = Array.isArray(fetched) ? fetched.filter((p: any) =>
+          !['prod-1', 'prod-2', 'prod-3', 'prod-4'].includes(p.id)
+        ) : [];
         const cachedStr = JSON.stringify(cached);
-        const fetchedStr = JSON.stringify(fetched);
-        if (cachedStr !== fetchedStr && fetched && fetched.length > 0) {
-          this.setStorageItem('adpulse_products', fetched);
+        const fetchedStr = JSON.stringify(cleanFetched);
+        if (cachedStr !== fetchedStr && Array.isArray(fetched)) {
+          this.setStorageItem('adpulse_products', cleanFetched);
           notifyDashboardListeners();
         }
       }).catch(e => console.warn("[BACKGROUND SYNC] Products background fetch failed, using local caching fallback:", e));
@@ -679,10 +512,20 @@ class DashboardService {
     const token = localStorage.getItem("_hyperlocal_access_token");
     if (token) {
       apiService.getCampaigns().then((fetched) => {
+        const cleanFetched = Array.isArray(fetched) ? fetched.filter((c: any) =>
+          c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+          c.name !== 'Diwali Festive Sparkle Mega Drive' &&
+          c.name !== 'Holi Organic Colors Carnival'
+        ).map((c: any) => {
+          if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
+            return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
+          }
+          return c;
+        }) : [];
         const cachedStr = JSON.stringify(cached);
-        const fetchedStr = JSON.stringify(fetched);
-        if (cachedStr !== fetchedStr && fetched && fetched.length > 0) {
-          this.setStorageItem('adpulse_campaigns', fetched);
+        const fetchedStr = JSON.stringify(cleanFetched);
+        if (cachedStr !== fetchedStr && Array.isArray(fetched)) {
+          this.setStorageItem('adpulse_campaigns', cleanFetched);
           notifyDashboardListeners();
         }
       }).catch(e => console.warn("[BACKGROUND SYNC] Campaigns background fetch failed, using local caching fallback:", e));

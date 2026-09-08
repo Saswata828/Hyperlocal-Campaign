@@ -90,8 +90,8 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
   const engagementRate = realtimeData?.summary?.engagementRate ?? (campaigns.length > 0 ? parseFloat((campaigns.reduce((acc, c) => acc + (c.reach ? ((c.engagement || 0) / c.reach) * 100 : 0), 0) / campaigns.length).toFixed(1)) : 0);
 
   // Nearby Audience intelligence dynamically calculated from configured shop radii
-  const primaryStore = stores[0] || { name: 'Sambalpur Saree Kendra', radiusTargetKm: 5, latitude: 21.4669 };
-  const isSambalpur = primaryStore.name.toLowerCase().includes('sambalpur') || 
+  const primaryStore = stores[0] || { name: 'My Local Outlet', radiusTargetKm: 5, latitude: 20.23 };
+  const isSambalpur = (primaryStore.name && primaryStore.name.toLowerCase().includes('sambalpur')) || 
                       (primaryStore.address && primaryStore.address.toLowerCase().includes('sambalpur'));
   
   const audienceBase = primaryStore.radiusTargetKm * 3200;
@@ -211,7 +211,7 @@ export const DashboardHome: React.FC<{ onViewTab: (tab: string) => void }> = ({ 
             </span>
           </h1>
           <p className="text-xs text-slate-500 font-medium tracking-wide mt-1">
-            Running tailored geocultural algorithms on <strong className="text-indigo-650">{primaryStore?.name || 'Sambalpur Main Outlet'}</strong>.
+            Running tailored geocultural algorithms on <strong className="text-indigo-650">{primaryStore?.name || 'Local Outlet'}</strong>.
           </p>
         </div>
 

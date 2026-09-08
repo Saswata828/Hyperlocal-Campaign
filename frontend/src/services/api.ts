@@ -137,35 +137,18 @@ const saveEmulatedOtps = (otps: any) => {
 const getEmulatedStores = () => {
   try {
     const raw = localStorage.getItem("_emulated_stores") || localStorage.getItem("adpulse_stores");
-    if (raw) return JSON.parse(raw);
-  } catch (e) { }
-  const defaults = [
-    {
-      id: 'store-1',
-      name: 'AdPulse Hyperlocal Hub - Main Branch',
-      address: '102, Connaught Place, New Delhi, 110001',
-      phone: '+91 98765 43210',
-      category: 'SaaS & Ad Services',
-      hours: '09:00 AM - 08:00 PM',
-      radiusTargetKm: 5,
-      status: 'Active',
-      latitude: 28.6304,
-      longitude: 77.2177
-    },
-    {
-      id: 'store-2',
-      name: 'AdPulse Premium Express',
-      address: '405, Sector 5, Salt Lake, Kolkata, 700091',
-      phone: '+91 98765 11223',
-      category: 'Retail Apparel',
-      hours: '10:00 AM - 09:30 PM',
-      radiusTargetKm: 8,
-      status: 'Active',
-      latitude: 22.5726,
-      longitude: 88.4339
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((s: any) =>
+          s.id !== 'store-1' && s.id !== 'store-2' &&
+          s.name !== 'AdPulse Hyperlocal Hub - Main Branch' &&
+          s.name !== 'AdPulse Premium Express'
+        );
+      }
     }
-  ];
-  return defaults;
+  } catch (e) { }
+  return [];
 };
 
 const saveEmulatedStores = (stores: any[]) => {
@@ -176,31 +159,14 @@ const saveEmulatedStores = (stores: any[]) => {
 const getEmulatedProducts = () => {
   try {
     const raw = localStorage.getItem("_emulated_products") || localStorage.getItem("adpulse_products");
-    if (raw) return JSON.parse(raw);
-  } catch (e) { }
-  const defaults = [
-    {
-      id: 'prod-1',
-      name: 'Summer Linen Kurti',
-      category: 'Fashion & Apparel',
-      price: 1499,
-      discount: 15,
-      stock: 120,
-      image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&q=80',
-      status: 'In Stock'
-    },
-    {
-      id: 'prod-2',
-      name: 'Designer Leather Sandals',
-      category: 'Footwear',
-      price: 3499,
-      discount: 20,
-      stock: 8,
-      image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=150&h=150&fit=crop&q=80',
-      status: 'Low Stock'
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p: any) => !['prod-1', 'prod-2', 'prod-3', 'prod-4'].includes(p.id));
+      }
     }
-  ];
-  return defaults;
+  } catch (e) { }
+  return [];
 };
 
 const saveEmulatedProducts = (products: any[]) => {
@@ -210,28 +176,24 @@ const saveEmulatedProducts = (products: any[]) => {
 const getEmulatedCampaigns = () => {
   try {
     const raw = localStorage.getItem("_emulated_campaigns") || localStorage.getItem("adpulse_campaigns");
-    if (raw) return JSON.parse(raw);
-  } catch (e) { }
-  return [
-    {
-      id: 'camp-1',
-      name: 'Summer Linen Fashion Warmup',
-      goal: 'Increase Offline Footfall',
-      festival: 'None',
-      audience: 'Young Adults & Professionals',
-      radiusKm: 5,
-      budget: 15000,
-      offer: 'Flat 15% discount on Linen collection',
-      tone: 'Trendy & Engaging',
-      platforms: ['Instagram', 'Facebook'],
-      headline: 'Beat the Heat with Chic Summer Linens',
-      caption: 'Stay cool and professional this season with our handcrafted Linen Kurtis. Crafted with love, available at our Connaught Place store!',
-      hashtags: ['SummerFashion', 'LinenStyle', 'DelhiBoutique', 'HyperlocalAd'],
-      performanceTrend: [120, 180, 240, 310, 420],
-      clicks: 420,
-      views: 7800
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((c: any) =>
+          c.id !== 'camp-1' && c.id !== 'camp-2' && c.id !== 'camp-3' &&
+          c.name !== 'Diwali Festive Sparkle Mega Drive' &&
+          c.name !== 'Holi Organic Colors Carnival' &&
+          c.name !== 'Summer Linen Fashion Warmup'
+        ).map((c: any) => {
+          if (c.id?.startsWith('camp-onb-') && (c.reach === 33750 || c.reach === 15750)) {
+            return { ...c, status: 'Draft', reach: 0, engagement: 0, leads: 0, roi: 0 };
+          }
+          return c;
+        });
+      }
     }
-  ];
+  } catch (e) { }
+  return [];
 };
 
 const saveEmulatedCampaigns = (campaigns: any[]) => {

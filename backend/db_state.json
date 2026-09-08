@@ -66,35 +66,38 @@
       "onboarded": true,
       "onboardingStep": "completed",
       "onboardingCompleted": true
+    },
+    {
+      "id": 6,
+      "name": "manualtest_1788892547219",
+      "ownerName": "manualtest_1788892547219",
+      "email": "manualtest_1788892547219@hyperlocal.ai",
+      "role": "MERCHANT",
+      "businessName": "AdPulse Dev Labs",
+      "mobileNumber": "9876543210",
+      "gstin": "27AAAAA1111A1Z1",
+      "enabled": true,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "password": "$2b$10$IQxArHK0bweAhchNms4lt.jjQAPiP.38Hbg8p6McrmX6x4GBG8f.a"
+    },
+    {
+      "id": 7,
+      "name": "manualtest_1788892570230",
+      "ownerName": "manualtest_1788892570230",
+      "email": "manualtest_1788892570230@hyperlocal.ai",
+      "role": "MERCHANT",
+      "businessName": "AdPulse Dev Labs",
+      "mobileNumber": "9876543210",
+      "gstin": "27AAAAA1111A1Z1",
+      "enabled": true,
+      "onboarded": true,
+      "onboardingStep": "completed",
+      "password": "$2b$10$odXVcqaj2Tn1aQ8wX65XtecUjdrYiO4v1wBNC6r1HN.aW2yTBMJpa"
     }
   ],
   "userStores": {
-    "nshishirkant@gmail.com": [
-      {
-        "id": "store-1",
-        "name": "AdPulse Hyperlocal Hub - Main Branch",
-        "address": "102, Connaught Place, New Delhi, 110001",
-        "phone": "+91 98765 43210",
-        "category": "SaaS & Ad Services",
-        "hours": "09:00 AM - 08:00 PM",
-        "radiusTargetKm": 5,
-        "status": "Active",
-        "latitude": 28.6304,
-        "longitude": 77.2177
-      },
-      {
-        "id": "store-2",
-        "name": "AdPulse Premium Express",
-        "address": "405, Sector 5, Salt Lake, Kolkata, 700091",
-        "phone": "+91 98765 11223",
-        "category": "Retail Apparel",
-        "hours": "10:00 AM - 09:30 PM",
-        "radiusTargetKm": 8,
-        "status": "Active",
-        "latitude": 22.5726,
-        "longitude": 88.4339
-      }
-    ],
+    "nshishirkant@gmail.com": [],
     "saswatamishra828@gmail.com": [
       {
         "id": "store-1784402282644",
@@ -136,6 +139,34 @@
         "longitude": 83.9812,
         "status": "Active"
       }
+    ],
+    "manualtest_1788892547219@hyperlocal.ai": [
+      {
+        "id": "store-1788892552509",
+        "name": "Odisha Handloom Master Store",
+        "address": "Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054",
+        "phone": "9437012345",
+        "category": "Clothing & Apparel",
+        "hours": "10:00 AM - 09:30 PM",
+        "radiusTargetKm": 7,
+        "latitude": 20.23437,
+        "longitude": 85.72724,
+        "status": "Active"
+      }
+    ],
+    "manualtest_1788892570230@hyperlocal.ai": [
+      {
+        "id": "store-1788892573180",
+        "name": "Odisha Handloom Master Store",
+        "address": "Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054",
+        "phone": "9437012345",
+        "category": "Clothing & Apparel",
+        "hours": "10:00 AM - 09:30 PM",
+        "radiusTargetKm": 7,
+        "latitude": 20.23437,
+        "longitude": 85.72724,
+        "status": "Active"
+      }
     ]
   },
   "userProducts": {
@@ -161,11 +192,11 @@
           "Facebook",
           "WhatsApp"
         ],
-        "status": "Active",
-        "reach": 33750,
-        "engagement": 9000,
-        "leads": 750,
-        "roi": 310,
+        "status": "Draft",
+        "reach": 0,
+        "engagement": 0,
+        "leads": 0,
+        "roi": 0,
         "startDate": "2026-07-17",
         "generatedHeadline": "Exclusive opening special of Hyperlocal Organics Test OutletLtd!",
         "generatedCaption": "Visit us nearby Test Address! Aligned for Regional Seasonal Fest celebrations. Hyperlocal Organics Test MerchantLtdTest Merchant is beautifully poised to capture high loyalty inside the Grocery vertical around Test Address. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable."
@@ -187,14 +218,66 @@
           "Facebook",
           "WhatsApp"
         ],
-        "status": "Active",
-        "reach": 33750,
-        "engagement": 9000,
-        "leads": 750,
-        "roi": 310,
+        "status": "Draft",
+        "reach": 0,
+        "engagement": 0,
+        "leads": 0,
+        "roi": 0,
         "startDate": "2026-07-19",
         "generatedHeadline": "Exclusive opening special of Hyperlocal OrganicsHyperlocal Organics Store!",
         "generatedCaption": "Visit us nearby 123 Main St, New York, NY! Aligned for Regional Seasonal Fest celebrations. Hyperlocal Organics is beautifully poised to capture high loyalty inside the Clothing vertical around 123 Main St, New York, NY. Delivering high-traction Increase Sales campaigns within a 5km zone remains highly viable."
+      }
+    ],
+    "manualtest_1788892547219@hyperlocal.ai": [
+      {
+        "id": "camp-onb-1788892552512",
+        "name": "First Launch Celebration Wave",
+        "goal": "Foot Traffic & In-Store Visits",
+        "festival": "Regional Seasonal Fest",
+        "audience": "All aged 25-34/35-44",
+        "radiusKm": 7,
+        "budget": 7500,
+        "offer": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "tone": "Festive & Promotional",
+        "platforms": [
+          "Instagram",
+          "Facebook",
+          "WhatsApp"
+        ],
+        "status": "Draft",
+        "reach": 0,
+        "engagement": 0,
+        "leads": 0,
+        "roi": 0,
+        "startDate": "2026-09-08",
+        "generatedHeadline": "Exclusive opening special of Odisha Handloom Master Store!",
+        "generatedCaption": "Visit us nearby Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054! Aligned for Regional Seasonal Fest celebrations. Odisha Handloom Emporium is beautifully poised to capture high loyalty inside the Clothing & Apparel vertical around Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054. Delivering high-traction Foot Traffic & In-Store Visits campaigns within a 7km zone remains highly viable."
+      }
+    ],
+    "manualtest_1788892570230@hyperlocal.ai": [
+      {
+        "id": "camp-onb-1788892573199",
+        "name": "First Launch Celebration Wave",
+        "goal": "Foot Traffic & In-Store Visits",
+        "festival": "Regional Seasonal Fest",
+        "audience": "All aged 25-34/35-44",
+        "radiusKm": 7,
+        "budget": 7500,
+        "offer": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "tone": "Festive & Promotional",
+        "platforms": [
+          "Instagram",
+          "Facebook",
+          "WhatsApp"
+        ],
+        "status": "Draft",
+        "reach": 0,
+        "engagement": 0,
+        "leads": 0,
+        "roi": 0,
+        "startDate": "2026-09-08",
+        "generatedHeadline": "Exclusive opening special of Odisha Handloom Master Store!",
+        "generatedCaption": "Visit us nearby Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054! Aligned for Regional Seasonal Fest celebrations. Odisha Handloom Emporium is beautifully poised to capture high loyalty inside the Clothing & Apparel vertical around Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054. Delivering high-traction Foot Traffic & In-Store Visits campaigns within a 7km zone remains highly viable."
       }
     ]
   },
@@ -427,6 +510,124 @@
           }
         ],
         "recommendedAudience": "All, specifically Local Residents, Professionals aged 25-34, 35-44 residing near 123 Main St, New York, NY.",
+        "recommendedFestivals": [
+          "Regional Seasonal Fest",
+          "New Year Clearance Sale",
+          "National Holidays Celebration"
+        ],
+        "suggestedOfferStrategy": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "marketingReadinessScore": 78
+      }
+    },
+    "manualtest_1788892547219@hyperlocal.ai": {
+      "completed": true,
+      "business": {
+        "businessName": "Odisha Handloom Emporium",
+        "category": "Clothing & Apparel",
+        "description": "Authentic handcrafted textiles",
+        "gstNumber": "21AAAAA0000A1Z5",
+        "website": "https://odishahandloom.com"
+      },
+      "store": {
+        "storeName": "Odisha Handloom Master Store",
+        "storeAddress": "Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054",
+        "contactNumber": "9437012345",
+        "openingHours": "10:00 AM - 09:30 PM",
+        "storeType": "Single Store"
+      },
+      "location": {
+        "latitude": 20.23437,
+        "longitude": 85.72724,
+        "radiusKm": 7
+      },
+      "audience": {
+        "ageGroups": [
+          "25-34",
+          "35-44"
+        ],
+        "gender": "All",
+        "customerTypes": [
+          "Local Residents"
+        ]
+      },
+      "social": null,
+      "preferences": {
+        "campaignGoal": "Foot Traffic & In-Store Visits",
+        "budgetRange": "₹5,000 - ₹10,000",
+        "tone": "Festive & Promotional"
+      },
+      "aiAnalysis": {
+        "businessSummary": "Odisha Handloom Emporium is beautifully poised to capture high loyalty inside the Clothing & Apparel vertical around Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054. Delivering high-traction Foot Traffic & In-Store Visits campaigns within a 7km zone remains highly viable.",
+        "suggestedCampaignTypes": [
+          {
+            "name": "First Launch Celebration Wave",
+            "description": "Promote opening specials on social circles with local maps markers."
+          },
+          {
+            "name": "Direct Neighbors WhatsApp Bundle",
+            "description": "Direct personalized greeting outreach highlighting store convenience."
+          }
+        ],
+        "recommendedAudience": "All, specifically Local Residents aged 25-34, 35-44 residing near Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054.",
+        "recommendedFestivals": [
+          "Regional Seasonal Fest",
+          "New Year Clearance Sale",
+          "National Holidays Celebration"
+        ],
+        "suggestedOfferStrategy": "Provide competitive launch incentives such as \"Flat 15% OFF\" or curated \"First Visit Gifts\" to drive neighborhood foot traffic.",
+        "marketingReadinessScore": 78
+      }
+    },
+    "manualtest_1788892570230@hyperlocal.ai": {
+      "completed": true,
+      "business": {
+        "businessName": "Odisha Handloom Emporium",
+        "category": "Clothing & Apparel",
+        "description": "Authentic handcrafted textiles",
+        "gstNumber": "21AAAAA0000A1Z5",
+        "website": "https://odishahandloom.com"
+      },
+      "store": {
+        "storeName": "Odisha Handloom Master Store",
+        "storeAddress": "Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054",
+        "contactNumber": "9437012345",
+        "openingHours": "10:00 AM - 09:30 PM",
+        "storeType": "Single Store"
+      },
+      "location": {
+        "latitude": 20.23437,
+        "longitude": 85.72724,
+        "radiusKm": 7
+      },
+      "audience": {
+        "ageGroups": [
+          "25-34",
+          "35-44"
+        ],
+        "gender": "All",
+        "customerTypes": [
+          "Local Residents"
+        ]
+      },
+      "social": null,
+      "preferences": {
+        "campaignGoal": "Foot Traffic & In-Store Visits",
+        "budgetRange": "₹5,000 - ₹10,000",
+        "tone": "Festive & Promotional"
+      },
+      "aiAnalysis": {
+        "businessSummary": "Odisha Handloom Emporium is beautifully poised to capture high loyalty inside the Clothing & Apparel vertical around Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054. Delivering high-traction Foot Traffic & In-Store Visits campaigns within a 7km zone remains highly viable.",
+        "suggestedCampaignTypes": [
+          {
+            "name": "First Launch Celebration Wave",
+            "description": "Promote opening specials on social circles with local maps markers."
+          },
+          {
+            "name": "Direct Neighbors WhatsApp Bundle",
+            "description": "Direct personalized greeting outreach highlighting store convenience."
+          }
+        ],
+        "recommendedAudience": "All, specifically Local Residents aged 25-34, 35-44 residing near Plot 105, Badaraghunathpur, Near GITA Autonomous College, Bhubaneswar, 752054.",
         "recommendedFestivals": [
           "Regional Seasonal Fest",
           "New Year Clearance Sale",
