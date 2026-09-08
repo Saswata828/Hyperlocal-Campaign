@@ -881,6 +881,15 @@ export const apiService = {
     );
   },
 
+  async geocodeLocation(q: string) {
+    return runApi(
+      apiClient.get(`/geocode?q=${encodeURIComponent(q)}`).then(res => res.data),
+      async () => {
+        return null;
+      }
+    );
+  },
+
   async saveOnboardingLocation(payload: {
     latitude: number;
     longitude: number;

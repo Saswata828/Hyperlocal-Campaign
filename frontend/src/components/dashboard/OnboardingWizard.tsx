@@ -268,45 +268,79 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       }
     }
 
-    // 2. Query OpenStreetMap Nominatim API for real-time worldwide coordinate resolution
+    // 2. Try Backend Geocoding Proxy (server-side, zero CORS issues)
+    try {
+      const proxyRes = await apiService.geocodeLocation(clean);
+      if (proxyRes && proxyRes.success && proxyRes.latitude && proxyRes.longitude) {
+        setLatitude(proxyRes.latitude);
+        setLongitude(proxyRes.longitude);
+        if (updateAddress && !storeAddress) {
+          setStoreAddress(proxyRes.displayName || clean);
+        }
+        setSuccessText(`Map location pinned to ${clean}!`);
+        setTimeout(() => setSuccessText(null), 3000);
+        setSearchingLocation(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("[GEOCODE] Backend proxy attempt bypassed:", err);
+    }
+
+    // 3. Query Photon OpenStreetMap API (Free public CORS for client browsers)
     for (const qStr of queriesToTry) {
       try {
-        const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-          params: {
-            q: qStr,
-            format: 'json',
-            limit: 1,
-            addressdetails: 1
-          },
-          headers: {
-            'Accept-Language': 'en',
-            'User-Agent': 'HyperlocalCampaignPlatformApp/1.0'
-          },
-          timeout: 4500
-        });
-
-        if (res.data && res.data.length > 0) {
-          const top = res.data[0];
-          const newLat = parseFloat(top.lat);
-          const newLng = parseFloat(top.lon);
-          if (!isNaN(newLat) && !isNaN(newLng)) {
-            setLatitude(newLat);
-            setLongitude(newLng);
-            if (updateAddress && !storeAddress) {
-              setStoreAddress(top.display_name);
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(qStr)}&limit=1`;
+        const res = await axios.get(photonUrl, { timeout: 4000 });
+        if (res.data?.features && res.data.features.length > 0) {
+          const feat = res.data.features[0];
+          const coords = feat.geometry?.coordinates;
+          if (coords && coords.length >= 2) {
+            const lng = coords[0];
+            const lat = coords[1];
+            if (!isNaN(lat) && !isNaN(lng)) {
+              setLatitude(lat);
+              setLongitude(lng);
+              const label = [feat.properties?.name, feat.properties?.city, feat.properties?.state].filter(Boolean).join(', ');
+              if (updateAddress && !storeAddress && label) {
+                setStoreAddress(label);
+              }
+              setSuccessText(`Map location pinned to ${qStr}!`);
+              setTimeout(() => setSuccessText(null), 3500);
+              setSearchingLocation(false);
+              return;
             }
-            setSuccessText(`Map pinned to ${qStr}!`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[GEOCODE] Photon failed for "${qStr}":`, err);
+      }
+    }
+
+    // 4. Query Open-Meteo Geocoding API (Open browser CORS fallback)
+    for (const qStr of queriesToTry) {
+      try {
+        const mainPart = qStr.split(',')[0].trim();
+        const meteoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(mainPart)}&count=1&language=en&format=json`;
+        const res = await axios.get(meteoUrl, { timeout: 4000 });
+        if (res.data?.results && res.data.results.length > 0) {
+          const top = res.data.results[0];
+          const lat = parseFloat(top.latitude);
+          const lng = parseFloat(top.longitude);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            setLatitude(lat);
+            setLongitude(lng);
+            setSuccessText(`Map location pinned to ${top.name}!`);
             setTimeout(() => setSuccessText(null), 3500);
             setSearchingLocation(false);
             return;
           }
         }
       } catch (err) {
-        console.warn(`[GEOLOCATION] OpenStreetMap Nominatim lookup failed for "${qStr}":`, err);
+        console.warn(`[GEOCODE] Open-Meteo failed for "${qStr}":`, err);
       }
     }
 
-    setSuccessText("Could not resolve location automatically. You can click on the map or use Auto-GPS.");
+    setSuccessText("Could not resolve location automatically. You can click on the map, edit coordinates directly, or use Auto-GPS.");
     setTimeout(() => setSuccessText(null), 4000);
     setSearchingLocation(false);
   };

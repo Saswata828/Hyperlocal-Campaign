@@ -2460,6 +2460,43 @@ app.post("/api/onboarding/store", authGuard, (req: any, res) => {
   res.json({ success: true, message: "Store details saved as draft", data: state.store });
 });
 
+// Geocoding Proxy Endpoint (Bypasses Browser CORS/User-Agent Restrictions)
+app.get("/api/geocode", async (req, res) => {
+  const q = (req.query.q as string || "").trim();
+  if (!q) {
+    return res.status(400).json({ success: false, message: "Query parameter 'q' is required." });
+  }
+
+  try {
+    const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+      params: { q, format: "json", limit: 1, addressdetails: 1 },
+      headers: {
+        "Accept-Language": "en",
+        "User-Agent": "HyperlocalPlatformBackend/1.0 (contact: support@hyperlocal.ai)"
+      },
+      timeout: 5000
+    });
+
+    if (response.data && response.data.length > 0) {
+      const top = response.data[0];
+      const lat = parseFloat(top.lat);
+      const lng = parseFloat(top.lon);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return res.json({
+          success: true,
+          latitude: lat,
+          longitude: lng,
+          displayName: top.display_name
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn("[GEOCODE PROXY] Nominatim error:", err.message);
+  }
+
+  return res.status(404).json({ success: false, message: "Location coordinates could not be resolved." });
+});
+
 app.post("/api/onboarding/location", authGuard, (req: any, res) => {
   const email = req.user.email.toLowerCase();
   const state = getScopedOnboarding(email);
