@@ -574,7 +574,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <img 
                 src="/logo.png" 
                 alt="AdPulse AI" 
-                className="h-10 w-10 rounded-xl object-contain shadow-md shadow-indigo-500/30" 
+                className="h-10 w-10 rounded-xl object-cover shadow-md shadow-indigo-500/30" 
               />
               <div>
                 <h3 className="font-extrabold text-white text-base tracking-tight leading-none">AdPulse AI</h3>

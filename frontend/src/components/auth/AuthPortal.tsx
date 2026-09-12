@@ -417,7 +417,7 @@ export function AuthPortal({ initialMode = 'signin', onSuccess, onCancel, prefil
             <img 
               src="/logo.png" 
               alt="AdPulse AI" 
-              className="h-9 w-9 rounded-xl object-contain shadow-md shadow-indigo-500/20" 
+              className="h-9 w-9 rounded-xl object-cover shadow-md shadow-indigo-500/20" 
             />
             <div>
               <span className="text-[9px] font-black tracking-widest text-indigo-400 uppercase leading-none block">Hyperlocal</span>

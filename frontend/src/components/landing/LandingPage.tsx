@@ -131,7 +131,7 @@ export function LandingPage({ onLaunchPortal }: LandingPageProps) {
             <img 
               src="/logo.png" 
               alt="AdPulse AI Logo" 
-              className="h-10 w-10 rounded-xl object-contain shadow-md shadow-indigo-500/20 hover:scale-105 transition-transform" 
+              className="h-10 w-10 rounded-xl object-cover shadow-md shadow-indigo-500/20 hover:scale-105 transition-transform" 
             />
             <div>
               <span className="text-[10px] sm:text-xs font-black tracking-widest text-indigo-700 uppercase leading-none block">Hyperlocal</span>
@@ -201,15 +201,15 @@ export function LandingPage({ onLaunchPortal }: LandingPageProps) {
             {/* Left Column Text block */}
             <div className="lg:col-span-7 text-left space-y-6">
               
-              {/* Sparkle Tag */}
+              {/* Sparkle Tag with Official Logo */}
               <motion.div 
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-700 text-xs font-bold leading-none select-none"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-50/90 border border-indigo-150 rounded-full text-indigo-750 text-xs font-bold leading-none select-none shadow-xs"
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
-                <span>Next-Gen Store Traffic Driver</span>
+                <img src="/logo.png" alt="" className="h-4 w-4 rounded-xs object-cover" />
+                <span>Next-Gen Store Traffic Driver &bull; AdPulse AI</span>
               </motion.div>
 
               {/* Title Header */}

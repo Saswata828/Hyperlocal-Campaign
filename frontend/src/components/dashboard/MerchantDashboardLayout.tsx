@@ -227,7 +227,7 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
             <img 
               src="/logo.png" 
               alt="AdPulse AI" 
-              className="h-9 w-9 rounded-xl object-contain shadow-md shadow-indigo-500/20" 
+              className="h-9 w-9 rounded-xl object-cover shadow-md shadow-indigo-500/20" 
             />
             <div>
               <h2 className="text-sm font-black text-white tracking-tight leading-none">AdPulse AI</h2>
@@ -304,7 +304,7 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
                     <img 
                       src="/logo.png" 
                       alt="AdPulse AI" 
-                      className="h-8 w-8 rounded-lg object-contain shadow-sm" 
+                      className="h-8 w-8 rounded-lg object-cover shadow-sm" 
                     />
                     <span className="text-sm font-black text-white">AdPulse Portal</span>
                   </div>
