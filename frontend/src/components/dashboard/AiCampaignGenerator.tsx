@@ -29,7 +29,18 @@ import {
   Sparkle,
   Layers,
   HeartHandshake,
-  ExternalLink
+  ExternalLink,
+  Image,
+  Upload,
+  Link,
+  X,
+  ChevronDown,
+  Edit3,
+  Calendar,
+  Flame,
+  Globe,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dashboardService, Campaign } from '../../services/dashboardService';
@@ -120,6 +131,30 @@ export const AiCampaignGenerator: React.FC<{
   const isCustomFestival = customFestivalActive || (festival && !PRESET_FESTIVALS.includes(festival));
   const isCustomProduct = customProductActive || (product && !standardProducts.includes(product));
 
+  // Creative Banner / Image Import states
+  const [bannerImage, setBannerImage] = React.useState<string>("https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=800&auto=format&fit=crop&q=80");
+  const [showUrlInput, setShowUrlInput] = React.useState(false);
+  const [customImageUrl, setCustomImageUrl] = React.useState('');
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification('info', 'Please choose an image under 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          setBannerImage(ev.target.result as string);
+          showNotification('success', 'Custom campaign image loaded!');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // AI Copilot state managers
   const [variations, setVariations] = React.useState<CopilotVariation[]>([]);
   const [isGenerating, setIsGenerating] = React.useState(false);
@@ -147,6 +182,8 @@ export const AiCampaignGenerator: React.FC<{
   const [calendarData, setCalendarData] = React.useState<any[]>([]);
   const [isGeneratingCalendar, setIsGeneratingCalendar] = React.useState(false);
   const [copilotTab, setCopilotTab] = React.useState<'assistant' | 'score' | 'calendar' | 'poster'>('assistant');
+  const [isHistoryExpanded, setIsHistoryExpanded] = React.useState(false);
+  const [isEditingContent, setIsEditingContent] = React.useState(false);
 
   // Notifications feedback
   const [notiStatus, setNotiStatus] = React.useState<{ type: 'success' | 'info'; text: string } | null>(null);
@@ -192,6 +229,9 @@ export const AiCampaignGenerator: React.FC<{
       setProducts(productList);
       if (productList.length > 0) {
         setProduct(productList[0].name);
+        if (productList[0].image) {
+          setBannerImage(productList[0].image);
+        }
       }
 
       loadCampaignHistory();
@@ -484,7 +524,8 @@ export const AiCampaignGenerator: React.FC<{
       generatedHeadline: activeVariation.headline,
       generatedCaption: activeVariation.caption,
       generatedCtas: [activeVariation.cta],
-      generatedHashtags: activeVariation.hashtags
+      generatedHashtags: activeVariation.hashtags,
+      bannerUrl: bannerImage || ""
     };
 
     try {
@@ -554,7 +595,8 @@ export const AiCampaignGenerator: React.FC<{
       generatedHeadline: activeVariation.headline,
       generatedCaption: activeVariation.caption,
       generatedCtas: [activeVariation.cta],
-      generatedHashtags: activeVariation.hashtags
+      generatedHashtags: activeVariation.hashtags,
+      bannerUrl: bannerImage || ""
     };
 
     try {
@@ -572,7 +614,7 @@ export const AiCampaignGenerator: React.FC<{
         caption: fullCaption,
         headline: activeVariation.headline,
         platforms: platformsToPublish,
-        bannerUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=80",
+        bannerUrl: bannerImage || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=80",
         radiusKm,
         storeLocation,
         storeName: stores[0]?.name || "Store"
@@ -695,101 +737,104 @@ export const AiCampaignGenerator: React.FC<{
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start text-left">
         
-        {/* LEFT PANEL: CONFIGURATOR (35% on Large screens) */}
-        <div className="lg:col-span-4 bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-4 relative">
-          <div className="flex items-center gap-2.5 border-b border-rose-50/10 pb-3">
-            <div className="h-9 w-9 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center border border-rose-100">
-              <Zap className="h-4.5 w-4.5 animate-pulse" />
+        {/* LEFT PANEL: CONFIGURATOR (Spacious 3-Card Architecture) */}
+        <div className="lg:col-span-4 space-y-4">
+          
+          {/* Card 1: Campaign Context & Theme */}
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs space-y-4 text-left">
+            <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+              <div className="h-9 w-9 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center border border-rose-100 shadow-xs">
+                <Zap className="h-4.5 w-4.5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase text-slate-800 tracking-widest">1. Campaign Context</h3>
+                <p className="text-[10px] text-slate-400 font-medium leading-tight">Theme, festival hooks & localized language</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-black uppercase text-slate-800 tracking-widest">Targeting Context</h3>
-              <p className="text-[10px] text-slate-400 font-medium leading-tight">Config the hyperlocal parameters below</p>
-            </div>
-          </div>
 
-          {/* One-Click Festival Quickstart Row */}
-          <div className="bg-gradient-to-tr from-rose-50/70 to-rose-100/30 rounded-2xl p-3 border border-rose-100/50 space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-rose-600 animate-pulse" />
-              <span className="text-[10px] font-extrabold uppercase text-rose-700 tracking-wider">One-Click Festival Autofill</span>
+            {/* One-Click Festival Quickstart Row */}
+            <div className="bg-gradient-to-tr from-rose-50/70 to-rose-100/30 rounded-2xl p-3 border border-rose-100/60 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-rose-600 animate-pulse" />
+                <span className="text-[10px] font-extrabold uppercase text-rose-700 tracking-wider">One-Click Festival Autofill</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  id="quick-nuakhai-campaign"
+                  onClick={() => {
+                    setName("Nuakhai Juhar Sambalpuri Festive Drive");
+                    setFestival("Nuakhai Celebration");
+                    setBusinessCategory("Fashion & Apparel");
+                    setProduct("Sambalpuri Handloom Kurti");
+                    setOffer("Flat 20% off with Free Complimentary Gift Box");
+                    setAudience("Ethnic weavers, local families and modern festive shoppers");
+                    setLanguage("Odia");
+                    setBudget(20000);
+                    setBannerImage("https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=800&auto=format&fit=crop&q=80");
+                    setCustomCategoryActive(false);
+                    setCustomLocationActive(false);
+                    setCustomFestivalActive(false);
+                    setCustomProductActive(false);
+                    showNotification('success', "Loaded Nuakhai Sambalpuri Odia campaign details!");
+                  }}
+                  className="px-2 py-1.5 bg-white border border-rose-100 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
+                >
+                  🌾 Nuakhai
+                </button>
+                <button
+                  type="button"
+                  id="quick-diwali-campaign"
+                  onClick={() => {
+                    setName("Diwali Sparkle Gold Jewel Festival");
+                    setFestival("Diwali Sparkle Blockbuster");
+                    setBusinessCategory("Jewelry & Footwear");
+                    setProduct("Gold Filigree Earrings");
+                    setOffer("Flat 10% Cash Voucher + Extra Free Laxmi Silver Coin");
+                    setAudience("High value gifting families and local neighborhood couples");
+                    setLanguage("Hindi");
+                    setBudget(45000);
+                    setBannerImage("https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=800&auto=format&fit=crop&q=80");
+                    setCustomCategoryActive(false);
+                    setCustomLocationActive(false);
+                    setCustomFestivalActive(false);
+                    setCustomProductActive(false);
+                    showNotification('success', "Loaded Diwali Jewel Hindi campaign details!");
+                  }}
+                  className="px-2 py-1.5 bg-white border border-rose-100 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
+                >
+                  🪔 Diwali
+                </button>
+                <button
+                  type="button"
+                  id="quick-christmas-campaign"
+                  onClick={() => {
+                    setName("Winter Holiday & Christmas Home Joy Drive");
+                    setFestival("Weekend Flash Promotion");
+                    setBusinessCategory("Home Decor");
+                    setProduct("Handcrafted Sandalwood Giftbox");
+                    setOffer("Flat 25% Off Premium Cozy Winter Candle Collections");
+                    setAudience("Holiday interior decorators, young millennials and gift buyers");
+                    setLanguage("English");
+                    setBudget(25000);
+                    setBannerImage("https://images.unsplash.com/photo-1543258103-a62bdc069871?w=800&auto=format&fit=crop&q=80");
+                    setCustomCategoryActive(false);
+                    setCustomLocationActive(false);
+                    setCustomFestivalActive(false);
+                    setCustomProductActive(false);
+                    showNotification('success', "Loaded Christmas Holiday English campaign details!");
+                  }}
+                  className="px-2 py-1.5 bg-white border border-rose-100 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
+                >
+                  🎄 Christmas
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                id="quick-nuakhai-campaign"
-                onClick={() => {
-                  setName("Nuakhai Juhar Sambalpuri Festive Drive");
-                  setFestival("Nuakhai Celebration");
-                  setBusinessCategory("Fashion & Apparel");
-                  setProduct("Sambalpuri Handloom Kurti");
-                  setOffer("Flat 20% off with Free Complimentary Gift Box");
-                  setAudience("Ethnic weavers, local families and modern festive shoppers");
-                  setLanguage("Odia");
-                  setBudget(20000);
-                  setCustomCategoryActive(false);
-                  setCustomLocationActive(false);
-                  setCustomFestivalActive(false);
-                  setCustomProductActive(false);
-                  showNotification('success', "Loaded Nuakhai Sambalpuri Odia campaign details!");
-                }}
-                className="px-2 py-1.5 bg-white border border-rose-100/80 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
-              >
-                🌾 Nuakhai
-              </button>
-              <button
-                type="button"
-                id="quick-diwali-campaign"
-                onClick={() => {
-                  setName("Diwali Sparkle Gold Jewel Festival");
-                  setFestival("Diwali Sparkle Blockbuster");
-                  setBusinessCategory("Jewelry & Footwear");
-                  setProduct("Gold Filigree Earrings");
-                  setOffer("Flat 10% Cash Voucher + Extra Free Laxmi Silver Coin");
-                  setAudience("High value gifting families and local neighborhood couples");
-                  setLanguage("Hindi");
-                  setBudget(45000);
-                  setCustomCategoryActive(false);
-                  setCustomLocationActive(false);
-                  setCustomFestivalActive(false);
-                  setCustomProductActive(false);
-                  showNotification('success', "Loaded Diwali Jewel Hindi campaign details!");
-                }}
-                className="px-2 py-1.5 bg-white border border-rose-100/80 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
-              >
-                🪔 Diwali
-              </button>
-              <button
-                type="button"
-                id="quick-christmas-campaign"
-                onClick={() => {
-                  setName("Winter Holiday & Christmas Home Joy Drive");
-                  setFestival("Weekend Flash Promotion");
-                  setBusinessCategory("Home Decor");
-                  setProduct("Handcrafted Sandalwood Giftbox");
-                  setOffer("Flat 25% Off Premium Cozy Winter Candle Collections");
-                  setAudience("Holiday interior decorators, young millennials and gift buyers");
-                  setLanguage("English");
-                  setBudget(25000);
-                  setCustomCategoryActive(false);
-                  setCustomLocationActive(false);
-                  setCustomFestivalActive(false);
-                  setCustomProductActive(false);
-                  showNotification('success', "Loaded Christmas Holiday English campaign details!");
-                }}
-                className="px-2 py-1.5 bg-white border border-rose-100/80 text-[10px] font-bold text-rose-800 hover:bg-rose-50 hover:border-rose-200 transition rounded-xl text-center cursor-pointer shadow-2xs leading-tight"
-              >
-                🎄 Christmas
-              </button>
-            </div>
-          </div>
 
-          {/* Form Brief Inputs */}
-          <div className="space-y-4" id="generator-brief-form-section">
-            
-            {/* Title */}
+            {/* Campaign Title */}
             <div className="space-y-1">
               <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider flex items-center justify-between">
-                <span>Campaign Title Label</span>
+                <span>Campaign Title</span>
                 <span className="text-[9px] text-slate-400 font-normal">Internal name</span>
               </label>
               <input
@@ -797,32 +842,31 @@ export const AiCampaignGenerator: React.FC<{
                 placeholder="e.g. Sambalpuri Handloom Monsoon Special"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-550 focus:border-rose-550 text-xs font-semibold text-slate-800 outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-500 text-xs font-semibold text-slate-800 outline-none"
               />
             </div>
 
-            {/* Outflow Language Choice */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider flex items-center justify-between">
-                <span>Copywriting Language</span>
-                <span className="text-[9px] text-rose-600 font-bold px-1.5 py-0.5 bg-rose-50 rounded">Pro Localize</span>
-              </label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer hover:border-slate-300 transition"
-                id="outflow-language-selector"
-              >
-                <option value="English">🌐 English (Global Corporate)</option>
-                <option value="Hindi">🇮🇳 Hindi (हिंदी Marketing)</option>
-                <option value="Odia">🏮 Odia (ଓଡ଼ିଆ - Sambalpuri Core)</option>
-              </select>
-            </div>
-
+            {/* Language & Category */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Category */}
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Business Category</label>
+                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider flex items-center justify-between">
+                  <span>Language</span>
+                  <span className="text-[8.5px] text-rose-600 font-bold bg-rose-50 px-1 rounded">AI Pro</span>
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+                  id="outflow-language-selector"
+                >
+                  <option value="English">🌐 English</option>
+                  <option value="Hindi">🇮🇳 Hindi (हिंदी)</option>
+                  <option value="Odia">🏮 Odia (ଓଡ଼ିଆ)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Category</label>
                 <select
                   value={isCustomCategory ? "Other" : businessCategory}
                   onChange={(e) => {
@@ -837,27 +881,29 @@ export const AiCampaignGenerator: React.FC<{
                   }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
                 >
-                  <option value="Fashion & Apparel">👗 Fashion & Apparel</option>
-                  <option value="SaaS & Ad Services">💻 SaaS & Ad Services</option>
-                  <option value="Retail Outlets">🏬 Retail Outlets</option>
-                  <option value="Jewelry & Footwear">👑 Jewelry & Footwear</option>
-                  <option value="Home Decor">🕯️ Home Decor</option>
-                  <option value="Other">✍️ Other (Custom...)</option>
+                  <option value="Fashion & Apparel">👗 Fashion</option>
+                  <option value="SaaS & Ad Services">💻 SaaS</option>
+                  <option value="Retail Outlets">🏬 Retail</option>
+                  <option value="Jewelry & Footwear">👑 Jewelry</option>
+                  <option value="Home Decor">🕯️ Decor</option>
+                  <option value="Other">✍️ Custom...</option>
                 </select>
-                {isCustomCategory && (
-                  <input
-                    type="text"
-                    placeholder="Enter custom category..."
-                    value={businessCategory}
-                    onChange={(e) => setBusinessCategory(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-550 focus:border-rose-550 text-xs font-semibold text-slate-800 outline-none"
-                  />
-                )}
               </div>
+            </div>
+            {isCustomCategory && (
+              <input
+                type="text"
+                placeholder="Enter custom category..."
+                value={businessCategory}
+                onChange={(e) => setBusinessCategory(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none"
+              />
+            )}
 
-              {/* Store location dropdown or manual query */}
+            {/* Store Location & Target Event */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Boutique Location</label>
+                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Store Location</label>
                 <select
                   value={isCustomLocation ? "Other" : storeLocation}
                   onChange={(e) => {
@@ -870,30 +916,18 @@ export const AiCampaignGenerator: React.FC<{
                       setStoreLocation(val);
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer truncate"
                 >
-                  <option value="Sambalpur, Odisha">🏮 Sambalpur, Odisha</option>
-                  <option value="Connaught Place, New Delhi">🗼 Connaught Place, Delhi</option>
-                  <option value="Salt Lake, Kolkata">🏙️ Salt Lake, Kolkata</option>
+                  <option value="Sambalpur, Odisha">🏮 Sambalpur</option>
+                  <option value="Connaught Place, New Delhi">🗼 Delhi</option>
+                  <option value="Salt Lake, Kolkata">🏙️ Kolkata</option>
                   {stores.map(st => (
-                    <option key={st.id} value={st.address}>{st.name.substring(0, 15)}...</option>
+                    <option key={st.id} value={st.address}>{st.name.substring(0, 14)}...</option>
                   ))}
-                  <option value="Other">✍️ Other (Custom...)</option>
+                  <option value="Other">✍️ Custom...</option>
                 </select>
-                {isCustomLocation && (
-                  <input
-                    type="text"
-                    placeholder="Enter custom location..."
-                    value={storeLocation}
-                    onChange={(e) => setStoreLocation(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-550 focus:border-rose-550 text-xs font-semibold text-slate-800 outline-none"
-                  />
-                )}
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {/* Festival Selection */}
               <div className="space-y-1">
                 <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Target Event</label>
                 <select
@@ -908,62 +942,91 @@ export const AiCampaignGenerator: React.FC<{
                       setFestival(val);
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer truncate"
                 >
-                  <option value="Nuakhai Celebration">🌾 Nuakhai Celebration</option>
-                  <option value="Raja Festival Special">🌸 Raja Festival Special</option>
-                  <option value="Diwali Sparkle Blockbuster">✨ Diwali Celebration</option>
-                  <option value="Holi Carnival">🎨 Holi Carnival</option>
-                  <option value="Weekend Flash Promotion">⚡ Weekend Flash Promotion</option>
-                  <option value="Other">✍️ Other (Custom...)</option>
+                  <option value="Nuakhai Celebration">🌾 Nuakhai</option>
+                  <option value="Raja Festival Special">🌸 Raja Parba</option>
+                  <option value="Diwali Sparkle Blockbuster">✨ Diwali</option>
+                  <option value="Holi Carnival">🎨 Holi</option>
+                  <option value="Weekend Flash Promotion">⚡ Weekend</option>
+                  <option value="Other">✍️ Custom...</option>
                 </select>
-                {isCustomFestival && (
-                  <input
-                    type="text"
-                    placeholder="Enter custom festival event..."
-                    value={festival}
-                    onChange={(e) => setFestival(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-550 focus:border-rose-550 text-xs font-semibold text-slate-800 outline-none"
-                  />
-                )}
               </div>
+            </div>
+            {isCustomLocation && (
+              <input
+                type="text"
+                placeholder="Enter custom location..."
+                value={storeLocation}
+                onChange={(e) => setStoreLocation(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none"
+              />
+            )}
+            {isCustomFestival && (
+              <input
+                type="text"
+                placeholder="Enter custom festival event..."
+                value={festival}
+                onChange={(e) => setFestival(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none"
+              />
+            )}
+          </div>
 
-              {/* Product Reference */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Product Catalog</label>
-                <select
-                  value={isCustomProduct ? "Other" : product}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'Other') {
-                      setCustomProductActive(true);
-                      setProduct('');
-                    } else {
-                      setCustomProductActive(false);
-                      setProduct(val);
-                    }
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
-                >
-                  <option value="Sambalpuri Handloom Kurti">🧵 Sambalpuri Kurti</option>
-                  <option value="Designer Cotton Sarees">👗 Designer Cotton Sarees</option>
-                  <option value="Gold Filigree Earrings">💎 Gold Earrings</option>
-                  <option value="Handcrafted Sandalwood Giftbox">🎁 Sandalwood Box</option>
-                  {products.map(pr => (
-                    <option key={pr.id} value={pr.name}>{pr.name.substring(0, 16)}...</option>
-                  ))}
-                  <option value="Other">✍️ Other (Custom...)</option>
-                </select>
-                {isCustomProduct && (
-                  <input
-                    type="text"
-                    placeholder="Enter custom product catalog..."
-                    value={product}
-                    onChange={(e) => setProduct(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 focus:ring-1 focus:ring-rose-550 focus:border-rose-550 text-xs font-semibold text-slate-800 outline-none"
-                  />
-                )}
+          {/* Card 2: Product & Creative Banner Import Section */}
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100 shadow-xs">
+                  <Image className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase text-slate-800 tracking-widest">2. Product & Creative Banner</h3>
+                  <p className="text-[10px] text-slate-400 font-medium leading-tight">Attach item & custom ad creative photo</p>
+                </div>
               </div>
+            </div>
+
+            {/* Product Catalog Reference */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Product Catalog</label>
+              <select
+                value={isCustomProduct ? "Other" : product}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'Other') {
+                    setCustomProductActive(true);
+                    setProduct('');
+                  } else {
+                    setCustomProductActive(false);
+                    setProduct(val);
+                    const matched = products.find(p => p.name === val);
+                    if (matched && matched.image) {
+                      setBannerImage(matched.image);
+                      showNotification('info', `Imported photo from "${matched.name}"!`);
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+              >
+                <option value="Sambalpuri Handloom Kurti">🧵 Sambalpuri Kurti</option>
+                <option value="Designer Cotton Sarees">👗 Designer Cotton Sarees</option>
+                <option value="Gold Filigree Earrings">💎 Gold Earrings</option>
+                <option value="Handcrafted Sandalwood Giftbox">🎁 Sandalwood Box</option>
+                {products.map(pr => (
+                  <option key={pr.id} value={pr.name}>{pr.name.substring(0, 20)}</option>
+                ))}
+                <option value="Other">✍️ Other (Custom...)</option>
+              </select>
+              {isCustomProduct && (
+                <input
+                  type="text"
+                  placeholder="Enter custom product name..."
+                  value={product}
+                  onChange={(e) => setProduct(e.target.value)}
+                  className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none"
+                />
+              )}
             </div>
 
             {/* Compelling Offer */}
@@ -976,6 +1039,150 @@ export const AiCampaignGenerator: React.FC<{
                 onChange={(e) => setOffer(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-850 focus:ring-1 focus:ring-rose-500"
               />
+            </div>
+
+            {/* Creative Banner Section */}
+            <div className="pt-2 border-t border-slate-100 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-extrabold uppercase text-slate-600 tracking-wider flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>Campaign Banner / Photo</span>
+                </label>
+                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  Broadcasts to FB & IG
+                </span>
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleImageFileUpload}
+                className="hidden"
+              />
+
+              {/* If bannerImage exists: Show nice image preview card */}
+              {bannerImage ? (
+                <div className="relative group rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                  <img
+                    src={bannerImage}
+                    alt="Campaign Banner Preview"
+                    className="w-full h-36 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white/90 hover:bg-white text-slate-800 rounded-xl text-[11px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer transition-all"
+                    >
+                      <Upload className="h-3 w-3" />
+                      <span>Replace</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBannerImage('')}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-extrabold flex items-center gap-1 shadow-md cursor-pointer transition-all"
+                    >
+                      <X className="h-3 w-3" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                  <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center text-[9px] font-black text-white drop-shadow-md">
+                    <span className="bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Check className="h-2.5 w-2.5 text-emerald-400" />
+                      <span>Banner Attached</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-white/90 text-slate-900 px-2 py-0.5 rounded-md hover:bg-white cursor-pointer group-hover:hidden"
+                    >
+                      Change Photo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Empty upload dropzone */
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-250 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/30 rounded-2xl p-4 text-center cursor-pointer transition-all space-y-1.5"
+                >
+                  <div className="h-8 w-8 mx-auto rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <Upload className="h-4 w-4" />
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-700">Click to upload custom banner or photo</p>
+                  <p className="text-[9.5px] text-slate-400">Supports JPG, PNG, WebP up to 5MB</p>
+                </div>
+              )}
+
+              {/* Secondary image options (Sync from Product / Paste URL) */}
+              <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const matched = products.find(p => p.name === product) || products[0];
+                    if (matched && matched.image) {
+                      setBannerImage(matched.image);
+                      showNotification('success', `Imported photo from "${matched.name}"!`);
+                    } else {
+                      showNotification('info', 'No product image found in catalog. You can upload one above!');
+                    }
+                  }}
+                  className="hover:text-indigo-600 cursor-pointer flex items-center gap-1 text-slate-600"
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-500" />
+                  <span>Use Product Photo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                  className="hover:text-indigo-600 cursor-pointer flex items-center gap-1 text-slate-600"
+                >
+                  <Link className="h-3 w-3 text-slate-400" />
+                  <span>{showUrlInput ? 'Hide URL' : 'Paste Image URL'}</span>
+                </button>
+              </div>
+
+              {showUrlInput && (
+                <div className="flex gap-1.5 pt-1">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/banner.jpg"
+                    value={customImageUrl}
+                    onChange={(e) => setCustomImageUrl(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customImageUrl.trim()) {
+                        setBannerImage(customImageUrl.trim());
+                        setShowUrlInput(false);
+                        setCustomImageUrl('');
+                        showNotification('success', 'Banner URL applied!');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 3: Targeting, Geofence & Platforms */}
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs space-y-4 text-left">
+            <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+              <div className="h-9 w-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center border border-emerald-100 shadow-xs">
+                <MapPin className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase text-slate-800 tracking-widest">3. Geofencing & Channels</h3>
+                <p className="text-[10px] text-slate-400 font-medium leading-tight">Delivery radius, target audience & social networks</p>
+              </div>
             </div>
 
             {/* Target Audience */}
@@ -1003,7 +1210,7 @@ export const AiCampaignGenerator: React.FC<{
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-2 gap-3.5 pt-1">
               {/* Geofence radius slider */}
               <div className="space-y-1 text-[9px] font-extrabold text-slate-400">
                 <div className="flex justify-between items-center text-[10px] text-slate-450 uppercase mb-0.5">
@@ -1039,7 +1246,7 @@ export const AiCampaignGenerator: React.FC<{
             </div>
 
             {/* Target Channels */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-1">
               <label className="text-[10px] font-extrabold uppercase text-slate-450 tracking-wider">Social Channels</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
@@ -1076,13 +1283,13 @@ export const AiCampaignGenerator: React.FC<{
               onClick={generateCampaignCopilot}
               isLoading={isGenerating}
               disabled={!offer}
-              className="bg-black hover:bg-zinc-900 border-none rounded-xl text-white py-2.5 font-extrabold text-xs uppercase tracking-wider shadow-lg hover:shadow-black/10 active:scale-98 transition-all"
+              className="bg-black hover:bg-zinc-900 border-none rounded-2xl text-white py-3 font-extrabold text-xs uppercase tracking-wider shadow-lg hover:shadow-black/10 active:scale-98 transition-all mt-1"
             >
               <Sparkles className="h-4 w-4 mr-2 text-rose-300 animate-spin" />
               <span>Compile enterprise draft</span>
             </Button>
-
           </div>
+
         </div>
 
         {/* CENTER PANEL: COPILOT STUDIO & MULTI-VARIATIONS (45% on Large screens) */}
@@ -1207,6 +1414,25 @@ export const AiCampaignGenerator: React.FC<{
 
                     {/* COPY REVIEW BOARD */}
                     <div className="space-y-3 select-text">
+                      {/* Creative Banner Preview (Imported / Catalog Photo) */}
+                      {bannerImage && (
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs mb-3 group">
+                          <img
+                            src={bannerImage}
+                            alt="Campaign Creative Banner"
+                            className="w-full h-44 object-cover"
+                          />
+                          <div className="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1.5 shadow-sm">
+                            <Image className="h-3 w-3 text-rose-400" />
+                            <span>Ad Creative Banner</span>
+                          </div>
+                          <div className="absolute bottom-2.5 right-2.5 bg-white/90 backdrop-blur-md text-slate-800 px-2.5 py-1 rounded-lg text-[9px] font-extrabold shadow-sm flex items-center gap-1">
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span>Ready for FB & IG</span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Editable Headline */}
                       <div className="space-y-0.5">
                         <label className="text-[9px] font-black uppercase text-slate-400 block tracking-widest">Headline Output</label>

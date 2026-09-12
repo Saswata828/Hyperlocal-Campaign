@@ -182,21 +182,38 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
     setActiveTab(tab);
   };
 
-  // Sidebar item list config
-  const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart4 },
-    { id: 'generator', label: 'AI Campaign Generator', icon: Sparkles, badge: 'AI' },
-    { id: 'management', label: 'Campaign Management', icon: Target },
-    { id: 'stores', label: 'Store Management', icon: Store },
-    { id: 'products', label: 'Product Management', icon: ShoppingBag },
-    { id: 'festivals', label: 'Festival Analytics', icon: Flame, badge: 'New' },
-    { id: 'publishing', label: 'Social Media Publishing', icon: Send },
-    { id: 'connections', label: 'Connected Accounts', icon: ShieldCheck, badge: 'OAuth' },
-    { id: 'history', label: 'Publish History', icon: Clock },
-    { id: 'analytics', label: 'Analytics & Reports', icon: Bookmark },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
-    { id: 'support', label: 'Help & Support', icon: HelpCircle }
+  // Sidebar item list categorized config
+  const sidebarGroups = [
+    {
+      title: 'MAIN',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: BarChart4 },
+        { id: 'generator', label: 'AI Campaign Generator', icon: Sparkles, badge: 'AI Pro' },
+        { id: 'management', label: 'Campaign Management', icon: Target },
+        { id: 'stores', label: 'Store Management', icon: Store },
+        { id: 'products', label: 'Product Management', icon: ShoppingBag }
+      ]
+    },
+    {
+      title: 'INSIGHTS',
+      items: [
+        { id: 'festivals', label: 'Festival Analytics', icon: Flame, badge: 'New' },
+        { id: 'publishing', label: 'Social Media Publishing', icon: Send },
+        { id: 'analytics', label: 'Analytics & Reports', icon: Bookmark }
+      ]
+    },
+    {
+      title: 'MANAGEMENT',
+      items: [
+        { id: 'connections', label: 'Connected Accounts', icon: ShieldCheck, badge: 'OAuth' },
+        { id: 'history', label: 'Publish History', icon: Clock },
+        { id: 'settings', label: 'Settings', icon: SettingsIcon },
+        { id: 'support', label: 'Help & Support', icon: HelpCircle }
+      ]
+    }
   ];
+
+  const sidebarItems = sidebarGroups.flatMap(g => g.items);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -219,7 +236,7 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
     <div className="min-h-screen w-full bg-slate-50 flex text-slate-800 font-sans" id="merchant-dashboard-core-viewport">
       
       {/* 1. LEFT SIDEBAR: Desktop */}
-      <aside className="hidden lg:flex flex-col w-64 bg-slate-900 border-r border-slate-800 text-slate-300 p-5 shrink-0 justify-between select-none">
+      <aside className="hidden lg:flex flex-col w-[268px] bg-slate-900 border-r border-slate-800 text-slate-300 px-4 py-5 shrink-0 justify-between select-none">
         <div className="space-y-6">
           
           {/* Platform brand logo card */}
@@ -231,42 +248,50 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
             />
             <div>
               <h2 className="text-sm font-black text-white tracking-tight leading-none">AdPulse AI</h2>
-              <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-widest block mt-1">Hyperlocal SaaS</span>
+              <span className="text-[9.5px] font-bold text-indigo-400 uppercase tracking-widest block mt-1">MARKETING OS</span>
             </div>
           </div>
 
-          {/* Sidebar Menu Item list */}
-          <nav className="space-y-1 select-none">
-            {sidebarItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleViewTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer text-xs font-bold transition-all ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-805'
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <Icon className="h-4.5 w-4.5" />
-                    <span
-                      style={item.id === 'connections' ? { textAlign: 'justify', whiteSpace: 'nowrap' } : undefined}
-                      className={item.id === 'connections' ? 'whitespace-nowrap' : ''}
+          {/* Sidebar Menu Groups list */}
+          <nav className="space-y-4 select-none">
+            {sidebarGroups.map(group => (
+              <div key={group.title} className="space-y-1">
+                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider px-3.5 block mb-1">
+                  {group.title}
+                </span>
+                {group.items.map(item => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleViewTab(item.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl cursor-pointer text-xs font-bold transition-all ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                      }`}
                     >
-                      {item.label}
-                    </span>
-                  </span>
-                  {item.badge && (
-                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${isActive ? 'bg-white text-indigo-700' : 'bg-slate-800 text-indigo-400'}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="whitespace-nowrap">
+                          {item.label}
+                        </span>
+                      </span>
+                      {item.badge && (
+                        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded whitespace-nowrap shrink-0 ml-2 ${
+                          isActive 
+                            ? 'bg-white text-indigo-700' 
+                            : 'bg-slate-800 text-indigo-400'
+                        }`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
 
         </div>
@@ -333,10 +358,17 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
                           isActive ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        <span className="flex items-center gap-2.5">
-                          <Icon className="h-4 w-4" />
-                          <span>{item.label}</span>
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="whitespace-nowrap">{item.label}</span>
                         </span>
+                        {item.badge && (
+                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded whitespace-nowrap shrink-0 ml-2 ${
+                            isActive ? 'bg-white text-indigo-700' : 'bg-slate-800 text-indigo-400'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

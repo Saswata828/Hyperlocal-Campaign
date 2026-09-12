@@ -26,7 +26,7 @@
       "enabled": true,
       "onboarded": true,
       "onboardingStep": "completed",
-      "password": "$2b$10$p0KvcpuCqiKCHicy4cujD.EJuEez9mgm1maSz8UnlQTl0mqEwcYT6",
+      "password": "$2b$10$E3ANT6.j0etp3y4cHr/M.u3UoJp6WRJc6ibUuj13XQfVN3dkq/ryq",
       "registrationCompleted": true,
       "onboardingCompleted": true
     },
@@ -175,7 +175,45 @@
     "newmerchant@hyperlocal.ai": []
   },
   "userCampaigns": {
-    "saswatamishra828@gmail.com": [],
+    "saswatamishra828@gmail.com": [
+      {
+        "id": "camp-1789237127284",
+        "name": "Nuakhai Juhar Sambalpuri Festive Drive",
+        "goal": "Increase Offline Footfall",
+        "festival": "Nuakhai Celebration",
+        "audience": "Ethnic weavers, local families and modern festive shoppers",
+        "radiusKm": 24,
+        "budget": 20000,
+        "offer": "Flat 20% off with Free Complimentary Gift Box",
+        "tone": "Empathetic & Emotional",
+        "platforms": [
+          "facebook",
+          "instagram"
+        ],
+        "status": "Completed",
+        "reach": 130200,
+        "engagement": 39286,
+        "leads": 7266,
+        "roi": 291,
+        "startDate": "2026-09-12",
+        "generatedCaption": "ନିଜ ପରିବାର ପାଇଁ ସୁନ୍ଦର ପାର୍ବଣ ଉପହାର ❤️\n\nଏହି ପାର୍ବଣ ଋତୁରେ ପରିବାର ପାଇଁ ନେଇ ଆସନ୍ତୁ ସର୍ବୋତ୍ତମ ପାରମ୍ପରିକ ପୋଷାକ, ଯାହା ଆପଣଙ୍କ ଖୁସିକୁ ଦ୍ଵିଗୁଣିତ କରିବ। Get Flat 20% off with Free Complimentary Gift Box on our top releases. #LocalCommerce #ShopLocal #ExclusiveDeal\n\n👉 ବୁଢ଼ାରାଜା ଶୋ-ରୁମ୍ ପରିଦର୍ଶନ କରନ୍ତୁ\n\n#ShopLocal #ExclusiveDeal #LimitedTime #LocalBoutique",
+        "generatedHeadline": "ନିଜ ପରିବାର ପାଇଁ ସୁନ୍ଦର ପାର୍ବଣ ଉପହାର ❤️",
+        "bannerUrl": "https://dibyasikha.com/wp-content/uploads/2022/08/Nuakhai-6.jpeg",
+        "latitude": 20.2380445,
+        "longitude": 85.7231075,
+        "storeName": "Ram Electronics",
+        "storeLocation": "Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar ",
+        "geofence": {
+          "radiusKm": 24,
+          "latitude": 20.2380445,
+          "longitude": 85.7231075,
+          "storeName": "Ram Electronics",
+          "storeLocation": "Badaraghunathpur,Madanpur,near gita autonomous college bhubaneswar ",
+          "estimatedTargetedAccounts": 44400
+        },
+        "publishedAt": "2026-09-12T18:19:10.647Z"
+      }
+    ],
     "merchant@hyperlocal.ai": [],
     "newmerchant@hyperlocal.ai": [],
     "manualtest_1788892547219@hyperlocal.ai": [],
@@ -637,6 +675,14 @@
   "userNotifications": {
     "saswatamishra828@gmail.com": [
       {
+        "id": "notif-1789237150647-z7ws3",
+        "title": "Broadcast Published Successfully!",
+        "message": "Your dynamic creative was successfully published live to: facebook, instagram.",
+        "type": "success",
+        "timestamp": "2026-09-12T18:19:10.647Z",
+        "read": false
+      },
+      {
         "id": "notif-1788527272679-un3br",
         "title": "Broadcast Published Successfully!",
         "message": "Your dynamic creative was successfully published live to: instagram, facebook.",
@@ -939,7 +985,36 @@
     ]
   },
   "userPublishHistory": {
-    "saswatamishra828@gmail.com": [],
+    "saswatamishra828@gmail.com": [
+      {
+        "id": "hist-1789237150647-uihb",
+        "campaignId": "camp-1789237127284",
+        "campaignName": "Nuakhai Juhar Sambalpuri Festive Drive",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra",
+        "platform": "instagram",
+        "publishDate": "2026-09-12",
+        "publishTime": "23:49:10",
+        "status": "SUCCESS",
+        "postId": "17921979381424036",
+        "caption": "ନିଜ ପରିବାର ପାଇଁ ସୁନ୍ଦର ପାର୍ବଣ ଉପହାର ❤️\n\nଏହି ପାର୍ବଣ ଋତୁରେ ପରିବାର ପାଇଁ ନେଇ ଆସନ୍ତୁ ସର୍ବୋତ୍ତମ ପାରମ୍ପରିକ ପୋଷାକ, ଯାହା ଆପଣଙ୍କ ଖୁସିକୁ ଦ୍ଵିଗୁଣିତ କରିବ। Get Flat 20% off with Free Complimentary Gift Box on our top releases. #LocalCommerce #ShopLocal #ExclusiveDeal\n\n👉 ବୁଢ଼ାରାଜା ଶୋ-ରୁମ୍ ପରିଦର୍ଶନ କରନ୍ତୁ\n\n#ShopLocal #ExclusiveDeal #LimitedTime #LocalBoutique",
+        "bannerUrl": "https://dibyasikha.com/wp-content/uploads/2022/08/Nuakhai-6.jpeg"
+      },
+      {
+        "id": "hist-1789237150647-xjpg",
+        "campaignId": "camp-1789237127284",
+        "campaignName": "Nuakhai Juhar Sambalpuri Festive Drive",
+        "merchantEmail": "saswatamishra828@gmail.com",
+        "merchantName": "saswatamishra",
+        "platform": "facebook",
+        "publishDate": "2026-09-12",
+        "publishTime": "23:49:10",
+        "status": "SUCCESS",
+        "postId": "1391387907380060_122106753189467349",
+        "caption": "ନିଜ ପରିବାର ପାଇଁ ସୁନ୍ଦର ପାର୍ବଣ ଉପହାର ❤️\n\nଏହି ପାର୍ବଣ ଋତୁରେ ପରିବାର ପାଇଁ ନେଇ ଆସନ୍ତୁ ସର୍ବୋତ୍ତମ ପାରମ୍ପରିକ ପୋଷାକ, ଯାହା ଆପଣଙ୍କ ଖୁସିକୁ ଦ୍ଵିଗୁଣିତ କରିବ। Get Flat 20% off with Free Complimentary Gift Box on our top releases. #LocalCommerce #ShopLocal #ExclusiveDeal\n\n👉 ବୁଢ଼ାରାଜା ଶୋ-ରୁମ୍ ପରିଦର୍ଶନ କରନ୍ତୁ\n\n#ShopLocal #ExclusiveDeal #LimitedTime #LocalBoutique",
+        "bannerUrl": "https://dibyasikha.com/wp-content/uploads/2022/08/Nuakhai-6.jpeg"
+      }
+    ],
     "merchant@hyperlocal.ai": [
       {
         "id": "hist-1787672502851-b0nf",
