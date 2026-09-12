@@ -2295,18 +2295,39 @@ app.get("/api/stores", authGuard, (req: any, res) => {
 });
 
 app.post("/api/stores", authGuard, (req: any, res) => {
-  const { name, address, phone, category, hours, radiusTargetKm, latitude, longitude } = req.body;
+  const { id, name, address, phone, category, hours, radiusTargetKm, latitude, longitude, status } = req.body;
   const email = req.user.email.toLowerCase();
   const list = getScopedStores(email);
+
+  if (id) {
+    const existingIndex = list.findIndex(s => s.id === id);
+    if (existingIndex >= 0) {
+      list[existingIndex] = {
+        ...list[existingIndex],
+        ...(name !== undefined && { name }),
+        ...(address !== undefined && { address }),
+        ...(phone !== undefined && { phone }),
+        ...(category !== undefined && { category }),
+        ...(hours !== undefined && { hours }),
+        ...(radiusTargetKm !== undefined && { radiusTargetKm: Number(radiusTargetKm) }),
+        ...(status !== undefined && { status }),
+        ...(latitude !== undefined && { latitude: Number(latitude) }),
+        ...(longitude !== undefined && { longitude: Number(longitude) })
+      };
+      saveDbState(email);
+      return res.status(200).json(list[existingIndex]);
+    }
+  }
+
   const newStore = {
-    id: `store-${Date.now()}`,
+    id: id && !id.includes("tmp") ? id : `store-${Date.now()}`,
     name: name || "Untitled New Store",
     address: address || "",
     phone: phone || "",
     category: category || "Retail Stores",
     hours: hours || "09:00 AM - 08:00 PM",
     radiusTargetKm: Number(radiusTargetKm) || 5,
-    status: "Active" as const,
+    status: (status as any) || "Active",
     latitude: Number(latitude) || 28.6304,
     longitude: Number(longitude) || 77.2177
   };
@@ -2363,12 +2384,36 @@ app.get("/api/products", authGuard, (req: any, res) => {
 });
 
 app.post("/api/products", authGuard, (req: any, res) => {
-  const { name, category, price, discount, stock, image } = req.body;
+  const { id, name, category, price, discount, stock, image } = req.body;
   const email = req.user.email.toLowerCase();
   const list = getScopedProducts(email);
+
+  if (id) {
+    const existingIndex = list.findIndex(p => p.id === id);
+    if (existingIndex >= 0) {
+      const updatedStock = stock !== undefined ? Number(stock) : list[existingIndex].stock;
+      let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+      if (updatedStock === 0) status = 'Out of Stock';
+      else if (updatedStock < 10) status = 'Low Stock';
+
+      list[existingIndex] = {
+        ...list[existingIndex],
+        ...(name !== undefined && { name }),
+        ...(category !== undefined && { category }),
+        ...(price !== undefined && { price: Number(price) }),
+        ...(discount !== undefined && { discount: Number(discount) }),
+        stock: updatedStock,
+        ...(image !== undefined && { image }),
+        status
+      };
+      saveDbState(email);
+      return res.status(200).json(list[existingIndex]);
+    }
+  }
+
   const statusVal: 'In Stock' | 'Low Stock' | 'Out of Stock' = Number(stock) === 0 ? "Out of Stock" : Number(stock) < 10 ? "Low Stock" : "In Stock";
   const newProduct = {
-    id: `prod-${Date.now()}`,
+    id: id && !id.includes("tmp") ? id : `prod-${Date.now()}`,
     name: name || "New Product Apparel",
     category: category || "Uncategorized",
     price: Number(price) || 0,
@@ -3726,8 +3771,28 @@ app.get("/api/campaigns", authGuard, (req: any, res) => {
 app.post("/api/campaigns", authGuard, (req: any, res) => {
   const email = req.user.email.toLowerCase();
   const list = getScopedCampaigns(email);
+  const id = req.body.id;
+
+  if (id) {
+    const existingIndex = list.findIndex(c => c.id === id);
+    if (existingIndex >= 0) {
+      list[existingIndex] = {
+        ...list[existingIndex],
+        ...req.body,
+        radiusKm: req.body.radiusKm !== undefined ? Number(req.body.radiusKm) : list[existingIndex].radiusKm,
+        budget: req.body.budget !== undefined ? Number(req.body.budget) : list[existingIndex].budget,
+        reach: req.body.reach !== undefined ? Number(req.body.reach) : list[existingIndex].reach,
+        engagement: req.body.engagement !== undefined ? Number(req.body.engagement) : list[existingIndex].engagement,
+        leads: req.body.leads !== undefined ? Number(req.body.leads) : list[existingIndex].leads,
+        roi: req.body.roi !== undefined ? Number(req.body.roi) : list[existingIndex].roi
+      };
+      saveDbState(email);
+      return res.status(200).json(list[existingIndex]);
+    }
+  }
+
   const newCamp = {
-    id: req.body.id || `camp-${Date.now()}`,
+    id: id && !id.includes("tmp") ? id : `camp-${Date.now()}`,
     name: req.body.name || "Untitled Campaign",
     goal: req.body.goal || "",
     festival: req.body.festival || "",

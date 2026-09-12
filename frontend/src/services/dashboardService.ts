@@ -399,7 +399,8 @@ class DashboardService {
   public saveStore(store: Store): void {
     const current = this.getStores();
     const index = current.findIndex(s => s.id === store.id);
-    if (index >= 0) {
+    const isExisting = index >= 0;
+    if (isExisting) {
       current[index] = store;
     } else {
       current.push(store);
@@ -408,7 +409,7 @@ class DashboardService {
     notifyDashboardListeners();
 
     // Axios backend push
-    const isNew = store.id.includes("tmp") || Number(store.id.split('-')[1]) > 1700000000000;
+    const isNew = !isExisting || store.id.includes("tmp");
     if (isNew) {
       apiService.createStore(store).then(saved => {
         const fresh = this.getStorageItem<Store[]>('adpulse_stores', DEFAULT_STORES);
@@ -520,7 +521,8 @@ class DashboardService {
   public saveProduct(product: Product): void {
     const current = this.getProducts();
     const index = current.findIndex(p => p.id === product.id);
-    if (index >= 0) {
+    const isExisting = index >= 0;
+    if (isExisting) {
       current[index] = product;
     } else {
       current.push(product);
@@ -529,7 +531,7 @@ class DashboardService {
     notifyDashboardListeners();
 
     // Axios sync
-    const isNew = product.id.includes("tmp") || Number(product.id.split('-')[1]) > 1700000000000;
+    const isNew = !isExisting || product.id.includes("tmp");
     if (isNew) {
       apiService.createProduct(product).then(saved => {
         const fresh = this.getStorageItem<Product[]>('adpulse_products', DEFAULT_PRODUCTS);
@@ -657,7 +659,8 @@ class DashboardService {
   public saveCampaign(campaign: Campaign): void {
     const current = this.getCampaigns();
     const index = current.findIndex(c => c.id === campaign.id);
-    if (index >= 0) {
+    const isExisting = index >= 0;
+    if (isExisting) {
       current[index] = campaign;
     } else {
       current.push(campaign);
@@ -666,7 +669,7 @@ class DashboardService {
     notifyDashboardListeners();
 
     // Axios backend push
-    const isNew = campaign.id.includes("tmp") || campaign.id.startsWith("camp-") && Number(campaign.id.split('-')[1]) > 1700000000000;
+    const isNew = !isExisting || campaign.id.includes("tmp");
     if (isNew) {
       apiService.createCampaign(campaign).then(saved => {
         const fresh = this.getStorageItem<Campaign[]>('adpulse_campaigns', DEFAULT_CAMPAIGNS);

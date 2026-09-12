@@ -132,6 +132,7 @@ export const StoreManagement: React.FC = () => {
     dashboardService.saveStore(newStore);
     fetchStores();
     setIsModalOpen(false);
+    setEditingStoreId(null);
   };
 
   const handleDeleteStore = (id: string, name: string) => {
@@ -565,7 +566,10 @@ export const StoreManagement: React.FC = () => {
                 <div className="border-t border-slate-50 pt-4 flex items-center justify-end gap-2 text-xs font-extrabold">
                   <Button
                     variant="outline"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setEditingStoreId(null);
+                    }}
                     className="rounded-xl"
                   >
                     Cancel
