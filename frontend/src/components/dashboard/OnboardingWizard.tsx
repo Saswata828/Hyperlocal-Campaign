@@ -571,11 +571,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         <div className="md:w-76 bg-gradient-to-br from-indigo-950 via-slate-950 to-indigo-950 text-white p-6 sm:p-8 flex flex-col justify-between shrink-0 select-none text-left border-r border-indigo-900/40">
           <div className="space-y-6">
             <div className="flex items-center gap-2.5">
-              <div className="bg-indigo-500/20 max-w-max p-2 rounded-xl border border-indigo-500/20 backdrop-blur-md">
-                <Sparkles className="h-5 w-5 text-indigo-400 animate-pulse" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="AdPulse AI" 
+                className="h-10 w-10 rounded-xl object-contain shadow-md shadow-indigo-500/30" 
+              />
               <div>
-                <h3 className="font-extrabold text-white text-base tracking-tight leading-none">Hyperlocal AI</h3>
+                <h3 className="font-extrabold text-white text-base tracking-tight leading-none">AdPulse AI</h3>
                 <span className="text-[9.5px] text-indigo-300 uppercase tracking-widest font-black mt-1.5 block">Enterprise Merchant Onboarding</span>
               </div>
             </div>

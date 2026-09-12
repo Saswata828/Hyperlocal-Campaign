@@ -414,9 +414,11 @@ export function AuthPortal({ initialMode = 'signin', onSuccess, onCancel, prefil
         <div className="relative z-10 space-y-6">
           {/* Logo */}
           <div onClick={onCancel} className="flex items-center gap-2.5 cursor-pointer select-none group" id="brand-logo-back">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-md">
-              <Sparkles className="h-5 w-5 text-indigo-200" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="AdPulse AI" 
+              className="h-9 w-9 rounded-xl object-contain shadow-md shadow-indigo-500/20" 
+            />
             <div>
               <span className="text-[9px] font-black tracking-widest text-indigo-400 uppercase leading-none block">Hyperlocal</span>
               <h2 className="text-sm font-extrabold text-white tracking-tight">ADPULSE</h2>

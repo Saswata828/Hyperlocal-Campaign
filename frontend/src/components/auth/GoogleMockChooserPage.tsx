@@ -118,8 +118,12 @@ export function GoogleMockChooserPage({ onSuccess }: GoogleMockChooserPageProps)
         <h1 className="text-[22px] font-normal text-slate-800 text-center tracking-tight mb-1">
           Choose an account
         </h1>
-        <p className="text-xs text-slate-500 text-center mb-6">
-          to continue to <span className="font-semibold text-indigo-600">Hyperlocal Ad Pulse</span>
+        <p className="text-xs text-slate-500 text-center mb-6 flex items-center justify-center gap-1.5">
+          <span>to continue to</span>
+          <span className="font-semibold text-indigo-600 inline-flex items-center gap-1">
+            <img src="/logo.png" className="h-4 w-4 rounded-xs object-contain" alt="AdPulse" />
+            <span>AdPulse AI</span>
+          </span>
         </p>
 
         {/* Account Selection List */}

@@ -224,9 +224,11 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
           
           {/* Platform brand logo card */}
           <div className="flex items-center gap-2.5 px-2">
-            <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 h-9 w-9 rounded-xl flex items-center justify-center text-white shadow-md">
-              <Sparkles className="h-5 w-5 animate-pulse" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="AdPulse AI" 
+              className="h-9 w-9 rounded-xl object-contain shadow-md shadow-indigo-500/20" 
+            />
             <div>
               <h2 className="text-sm font-black text-white tracking-tight leading-none">AdPulse AI</h2>
               <span className="text-[9.5px] font-bold text-slate-500 uppercase tracking-widest block mt-1">Hyperlocal SaaS</span>
@@ -299,9 +301,11 @@ export const MerchantDashboardLayout: React.FC<LayoutProps> = ({ currentUser, on
                 {/* Brand close row */}
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="bg-indigo-600 h-8 w-8 rounded-lg flex items-center justify-center text-white">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
+                    <img 
+                      src="/logo.png" 
+                      alt="AdPulse AI" 
+                      className="h-8 w-8 rounded-lg object-contain shadow-sm" 
+                    />
                     <span className="text-sm font-black text-white">AdPulse Portal</span>
                   </div>
 

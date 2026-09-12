@@ -128,9 +128,11 @@ export function LandingPage({ onLaunchPortal }: LandingPageProps) {
           
           {/* Brand Logo and descriptor */}
           <div className="flex items-center gap-3 select-none cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-700 to-indigo-950 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-              <Target className="h-5.5 w-5.5 text-white" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="AdPulse AI Logo" 
+              className="h-10 w-10 rounded-xl object-contain shadow-md shadow-indigo-500/20 hover:scale-105 transition-transform" 
+            />
             <div>
               <span className="text-[10px] sm:text-xs font-black tracking-widest text-indigo-700 uppercase leading-none block">Hyperlocal</span>
               <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">AD PULSE</h2>
@@ -976,8 +978,8 @@ export function LandingPage({ onLaunchPortal }: LandingPageProps) {
       {/* FOOTER METADATA NOTICES */}
       <footer className="bg-slate-950 py-10 border-t border-slate-900 text-center select-none text-xs text-slate-500 font-semibold space-y-2">
         <p className="flex items-center justify-center gap-2">
-          <Target className="h-4 w-4 text-indigo-500" />
-          <span>© 2026 Hyperlocal Ad Pulse Inc. All simulated rights reserved.</span>
+          <img src="/logo.png" alt="AdPulse AI Logo" className="h-5 w-5 rounded-md object-contain inline-block" />
+          <span>© 2026 Hyperlocal Ad Pulse Inc. All rights reserved.</span>
         </p>
         <p className="text-[10px] text-slate-600 leading-normal max-w-xl mx-auto px-4">
           This system functions as a high-precision digital mockup simulating localized merchant campaigns on regional consumer hardware devices. Built using fully integrated TSX components and animated with React Motion limits.
